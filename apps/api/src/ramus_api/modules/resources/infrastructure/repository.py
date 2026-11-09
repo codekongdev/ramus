@@ -5,12 +5,14 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import delete, func, insert, or_, select
+from sqlalchemy import delete, func, insert, or_, select, update
 from sqlalchemy.orm import Session
 
 from ramus_api.modules.resources.application.ports import (
     AppliedRecord,
+    LockedHead,
     NewResource,
+    NewRevision,
     ResourceHistory,
     ResourceRecord,
     RevisionEntry,
@@ -97,6 +99,49 @@ class SqlResourceRepository:
             .order_by(ResourceRevisionRow.number)
         ).all()
         return ResourceHistory(_resource(*head), tuple(RevisionEntry(*entry) for entry in entries))
+
+    def revision(self, session: Session, revision_id: UUID) -> RevisionRecord | None:
+        row = session.get(ResourceRevisionRow, revision_id)
+        return None if row is None else _revision(row)
+
+    def lock_head(self, session: Session, resource_id: UUID) -> LockedHead | None:
+        resource = session.execute(
+            select(ResourceRow).where(ResourceRow.id == resource_id).with_for_update()
+        ).scalar_one_or_none()
+        if resource is None:
+            return None
+        latest = session.get(ResourceRevisionRow, resource.latest_revision_id)
+        return LockedHead(
+            resource.id,
+            resource.project_id,
+            ResourceKind(resource.kind),
+            latest.id,
+            latest.number,
+            latest.content_hash,
+        )
+
+    def add_revision(self, session: Session, revision: NewRevision) -> None:
+        content = revision.content
+        session.execute(
+            insert(ResourceRevisionRow).values(
+                id=revision.revision_id,
+                resource_id=revision.resource_id,
+                number=revision.number,
+                name=content.name,
+                description=content.description,
+                instructions=content.instructions,
+                content=content.content,
+                file_name=content.file_name,
+                content_hash=revision.content_hash,
+                base_revision_id=revision.base_revision_id,
+                created_by=revision.created_by,
+            )
+        )
+        session.execute(
+            update(ResourceRow)
+            .where(ResourceRow.id == revision.resource_id)
+            .values(latest_revision_id=revision.revision_id)
+        )
 
     def search(self, session: Session, project_id: UUID, query: str) -> Sequence[ResourceRecord]:
         statement = (

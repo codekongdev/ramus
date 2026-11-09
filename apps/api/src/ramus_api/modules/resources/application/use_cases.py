@@ -17,14 +17,17 @@ from ramus_api.modules.resources.application.ports import (
     AppliedRecord,
     ConversationDirectory,
     NewResource,
+    NewRevision,
     ProjectMembership,
     ResourceHistory,
     ResourceRecord,
     ResourceRepository,
+    RevisionRecord,
 )
 from ramus_api.modules.resources.domain.models import ResourceKind
 from ramus_api.modules.resources.domain.rules import (
     NOT_FOUND,
+    VERSION_CONFLICT,
     ResourceRuleError,
     check_applied_selection,
     content_hash,
@@ -49,6 +52,22 @@ class ResourceDraft:
     instructions: str | None
     content: str | None
     file_name: str | None
+
+
+@dataclass(frozen=True)
+class RevisionDraft:
+    base_revision_id: UUID
+    name: str
+    description: str
+    instructions: str | None
+    content: str | None
+    file_name: str | None
+
+
+@dataclass(frozen=True)
+class SavedRevision:
+    revision: RevisionRecord
+    created: bool
 
 
 @dataclass(frozen=True)
@@ -167,3 +186,71 @@ class ResourceUseCases(Generic[TransactionT]):
             data={"conversation_id": str(conversation_id)},
         )
         return Outcome(tuple(self.repository.applied(session, conversation_id)), (event,))
+
+    # --- B2: detail/history and new revisions -----------------------------------------------
+
+    def detail(
+        self, session: TransactionT, actor_id: UUID, resource_id: UUID, revision_id: UUID | None
+    ) -> tuple[ResourceHistory, RevisionRecord]:
+        """History plus the selected revision (default: latest). Viewing changes nothing."""
+        history = self.repository.history(session, resource_id)
+        if history is None:
+            raise ResourceRuleError(NOT_FOUND)
+        self._require_member(session, actor_id, history.resource.project_id)
+        if revision_id is None:
+            return history, history.resource.latest
+        selected = self.repository.revision(session, revision_id)
+        if selected is None or selected.resource_id != resource_id:
+            raise ResourceRuleError(NOT_FOUND)
+        return history, selected
+
+    def save_revision(
+        self, session: TransactionT, actor_id: UUID, resource_id: UUID, draft: RevisionDraft
+    ) -> Outcome[SavedRevision]:
+        """Saves v(n+1) on top of the latest. Never overwrites, never applies it to a conversation.
+
+        A stale base is a ``VERSION_CONFLICT`` (the client keeps its draft). Saving the latest
+        content again creates nothing (``created=False``), so retries cannot add duplicates.
+        """
+        head = self.repository.lock_head(session, resource_id)
+        if head is None:
+            raise ResourceRuleError(NOT_FOUND)
+        self._require_member(session, actor_id, head.project_id)
+        if draft.base_revision_id != head.latest_revision_id:
+            raise ResourceRuleError(
+                VERSION_CONFLICT,
+                {"latest_revision_id": str(head.latest_revision_id), "latest_number": head.latest_number},
+            )
+        content = normalize_content(
+            head.kind,
+            name=draft.name,
+            description=draft.description,
+            instructions=draft.instructions,
+            content=draft.content,
+            file_name=draft.file_name,
+        )
+        digest = content_hash(content)
+        if digest == head.latest_hash:
+            latest = self.repository.revision(session, head.latest_revision_id)
+            assert latest is not None
+            return Outcome(SavedRevision(latest, created=False))
+        revision_id = self.new_id()
+        number = head.latest_number + 1
+        self.repository.add_revision(
+            session,
+            NewRevision(revision_id, resource_id, number, head.latest_revision_id, content, digest, actor_id),
+        )
+        saved = self.repository.revision(session, revision_id)
+        assert saved is not None
+        event = ProjectEvent(
+            project_id=head.project_id,
+            name=EventName.RESOURCE_UPDATED,
+            occurred_at=self.now(),
+            data={
+                "project_id": str(head.project_id),
+                "resource_id": str(resource_id),
+                "latest_revision_id": str(revision_id),
+                "latest_number": number,
+            },
+        )
+        return Outcome(SavedRevision(saved, created=True), (event,))
