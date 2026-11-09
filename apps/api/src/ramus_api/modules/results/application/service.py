@@ -17,7 +17,7 @@ from ramus_api.modules.execution.domain.models import ConversationContext, Resul
 from ramus_api.modules.results.application.errors import rejected
 from ramus_api.modules.results.application.events import result_event
 from ramus_api.modules.results.application.ports import ResultRepository
-from ramus_api.modules.results.domain.records import ResultRecord, Revision, Source
+from ramus_api.modules.results.domain.records import ProjectResult, ResultRecord, Revision, Source
 from ramus_api.shared.domain.primitives import new_id
 
 
@@ -32,6 +32,20 @@ class ResultService:
     requester: RunRequester[Any]
     runs: RunReader[Any]
     events: CommittedEvents[Any]
+
+    def list_project(self, session, actor_id: UUID, project_id: UUID) -> tuple[ProjectResult, ...]:
+        self.access.require_member(session, project_id, actor_id)
+        approved = self.repository.approved_for_project(session, project_id)
+        if not approved:
+            return ()
+        conversations = {
+            conversation.id: conversation.title
+            for conversation in self.conversations.list_conversations(session, project_id)
+        }
+        return tuple(ProjectResult(
+            item.result_id, item.title, item.latest_version, item.latest_revision_id,
+            conversations[item.source_conversation_id], item.updated_at,
+        ) for item in approved)
 
     def _require(self, session, actor_id, result_id, *, lock=False) -> ResultRecord:
         result = self.repository.get(session, result_id, lock=lock)

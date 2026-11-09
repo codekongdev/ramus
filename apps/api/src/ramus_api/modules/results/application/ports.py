@@ -4,12 +4,13 @@ from typing import Protocol, TypeVar
 from uuid import UUID
 
 from ramus_api.modules.execution.domain.models import ConversationContext
-from ramus_api.modules.results.domain.records import ResultRecord, Revision, Source
+from ramus_api.modules.results.domain.records import ApprovedResult, ResultRecord, Revision, Source
 
 TransactionT = TypeVar("TransactionT", contravariant=True)
 
 
 class ResultRepository(Protocol[TransactionT]):
+    def approved_for_project(self, session: TransactionT, project_id: UUID) -> tuple[ApprovedResult, ...]: ...
     def get(self, session: TransactionT, result_id: UUID, *, lock: bool = False) -> ResultRecord | None: ...
     def for_task(self, session: TransactionT, task_id: UUID) -> ResultRecord | None: ...
     def create(

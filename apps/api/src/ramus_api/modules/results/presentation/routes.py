@@ -1,4 +1,4 @@
-"""Authenticated result summaries and approvals. Project listing remains B8's extension point."""
+"""Authenticated result summaries, approvals, and the project's saved result list."""
 
 from typing import Annotated
 from uuid import UUID
@@ -20,8 +20,7 @@ from ramus_api.modules.results.presentation.dto import (
     ResultRevision,
     SaveResultRevisionRequest,
 )
-from ramus_api.modules.results.presentation.mapping import result_dto, revision_dto
-from ramus_api.shared.presentation.error_messages import not_implemented
+from ramus_api.modules.results.presentation.mapping import project_result_dto, result_dto, revision_dto
 from ramus_api.shared.presentation.idempotency import IdempotencyKey
 from ramus_api.shared.presentation.schemas import EmptyRequest
 
@@ -69,7 +68,11 @@ def register(app: FastAPI, container: AppContainer) -> None:
         )
 
     @router.get("/projects/{project_id}/results", response_model=ProjectResultList, operation_id="listProjectResults")
-    def list_project_results(project_id: UUID):
-        raise not_implemented()
+    def list_project_results(project_id: UUID, account: CurrentAccount):
+        with container.database.transaction() as session:
+            return ProjectResultList(items=[
+                project_result_dto(result)
+                for result in service.list_project(session, account.account_id, project_id)
+            ])
 
     app.include_router(router)
