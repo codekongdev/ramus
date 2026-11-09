@@ -78,6 +78,7 @@ def register(app: FastAPI, container: AppContainer) -> None:
         payload: dict[str, Any],
         work: Callable[[Session], Outcome[Any]],
         render: Callable[[Any], Any],
+        authorize: Callable[[Session], Any],
     ) -> dict[str, Any]:
         def operation(session: Session) -> dict[str, Any]:
             outcome = work(session)
@@ -86,6 +87,9 @@ def register(app: FastAPI, container: AppContainer) -> None:
             return render(outcome.value).model_dump(mode="json")
 
         try:
+            # A stored response is not an authorization grant after membership is revoked.
+            # The use case checks again inside the mutation's transaction on first execution.
+            read(authorize)
             return container.idempotency.execute_once(str(account.account_id), scope, key, payload, operation)
         except ResourceRuleError as error:
             raise to_business_error(error) from None
@@ -128,6 +132,7 @@ def register(app: FastAPI, container: AppContainer) -> None:
             body.model_dump(mode="json"),
             lambda s: use_cases.create(s, account.account_id, project_id, draft),
             resource_detail,
+            lambda s: container.project_access.require_member(s, project_id, account.account_id),
         )
 
     @router.get("/resources/{resource_id}", response_model=ResourceDetail, operation_id="getResource")
@@ -163,6 +168,7 @@ def register(app: FastAPI, container: AppContainer) -> None:
             lambda saved: CreateResourceRevisionResponse(
                 revision=revision_dto(saved.revision), created=saved.created
             ),
+            lambda s: use_cases.detail(s, account.account_id, resource_id, None),
         )
 
     @router.get(
@@ -191,6 +197,7 @@ def register(app: FastAPI, container: AppContainer) -> None:
             body.model_dump(mode="json"),
             lambda s: use_cases.replace_applied(s, account.account_id, conversation_id, body.revision_ids),
             applied_list,
+            lambda s: use_cases.list_applied(s, account.account_id, conversation_id),
         )
 
     app.include_router(router)

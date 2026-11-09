@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { api as appApi, errorMessage, newIdempotencyKey, type ApiError, type AppApi } from '../../lib/api';
 import { useStore, type Dispatch } from '../../lib/mvi';
 import { useProjectEventListener, useResyncListener } from '../../lib/realtime';
@@ -6,6 +6,7 @@ import { Alert, Badge, Button, Checkbox, Chip, Dialog, EmptyState, Input, Label,
 import { makeResourcesEffectHandler, type ResourcesEffectDeps } from './effects';
 import {
   chipLabel,
+  detailLabel,
   fieldProblemMessage,
   fileProblemMessage,
   kindLabel,
@@ -17,6 +18,7 @@ import {
 } from './messages';
 import { initialResourcesState, type ResourcesIntent, type ResourcesState, type ResourceSummary } from './model';
 import { canApply, canRegister, resourcesReducer, validateSkillForm } from './reducer';
+import { ResourceRevisionStep } from './ResourceRevisionStep';
 import './resources.css';
 
 export type ResourcesModalProps = {
@@ -57,17 +59,33 @@ export function ResourcesModal(props: ResourcesModalProps) {
   useResyncListener(() => dispatch({ type: 'resynced' }));
 
   const register = state.step === 'register';
+  const detail = state.step === 'detail' && state.detailResourceId !== null;
+  const revisionBusyChanged = useCallback((busy: boolean) => dispatch({ type: 'detailBusyChanged', busy }), [dispatch]);
+  const busy = state.apply.status === 'saving' || state.form.status === 'saving' || state.detailBusy;
   return (
     <Dialog
       open
       title={m.modalTitle}
       onOpenChange={(open) => {
-        if (!open) onClose();
+        if (!open && !busy) onClose();
       }}
       className="resources-modal"
-      footer={register ? <RegisterFooter state={state} dispatch={dispatch} /> : <ListFooter state={state} dispatch={dispatch} />}
+      footer={detail ? undefined : register ? <RegisterFooter state={state} dispatch={dispatch} /> : <ListFooter state={state} dispatch={dispatch} />}
     >
-      {register ? <RegisterStep state={state} dispatch={dispatch} /> : <ListStep state={state} dispatch={dispatch} />}
+      {detail ? <ResourceRevisionStep
+        key={state.detailResourceId!}
+        resourceId={state.detailResourceId!}
+        projectId={projectId}
+        api={props.api ?? appApi}
+        onBack={() => dispatch({ type: 'backToList' })}
+        onApply={revision => dispatch({ type: 'revisionApplyRequested', revision, key: newIdempotencyKey() })}
+        canApply={conversationId !== null && state.applied.status === 'ready'}
+        applying={state.apply.status === 'saving'}
+        applyError={state.apply.error}
+        appliedRevisionId={state.applied.status === 'ready' ? state.applied.data.find(item => item.resource_id === state.detailResourceId)?.revision_id ?? null : null}
+        onBusyChange={revisionBusyChanged}
+        readBytes={props.readBytes}
+      /> : register ? <RegisterStep state={state} dispatch={dispatch} /> : <ListStep state={state} dispatch={dispatch} />}
     </Dialog>
   );
 }
@@ -214,14 +232,17 @@ function ResultRow({ resource, state, dispatch }: StepProps & { readonly resourc
           <p className="resources-row__versions">{versionSummary(resource.latest.number, resource.applied?.number ?? null)}</p>
         </div>
       </div>
-      {selected && selected.revisionId !== resource.latest.revision_id && (
-        <div className="resources-row__aside">
+      <div className="resources-row__aside">
+        <Button variant="link" size="sm" aria-label={detailLabel(name)} disabled={state.apply.status === 'saving'} onClick={() => dispatch({ type: 'detailOpened', resourceId: resource.id })}>
+          {m.detail}
+        </Button>
+        {selected && selected.revisionId !== resource.latest.revision_id && <>
           <span className="resources-row__selected">{selectedVersionNote(selected.number)}</span>
           <Button variant="link" size="sm" disabled={locked} onClick={() => dispatch({ type: 'latestChosen', resource })}>
             {useLatestLabel(resource.latest.number)}
           </Button>
-        </div>
-      )}
+        </>}
+      </div>
     </li>
   );
 }

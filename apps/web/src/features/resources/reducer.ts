@@ -65,7 +65,7 @@ export function selectionChanged(state: ResourcesState): boolean {
 export function canApply(state: ResourcesState): boolean {
   return (
     state.conversationId !== null &&
-    state.step === 'list' &&
+    state.step !== 'register' &&
     state.selection.length > 0 &&
     state.apply.status === 'idle' &&
     selectionChanged(state)
@@ -234,10 +234,24 @@ export const resourcesReducer: Reducer<ResourcesState, ResourcesIntent, Resource
       if (state.apply.status === 'saving') return next(state);
       return next({ ...state, step: 'register', form: emptySkillForm, fileSeq: state.fileSeq + 1 });
 
+    case 'detailOpened':
+      if (state.apply.status === 'saving' || state.form.status === 'saving' || state.detailBusy) return next(state);
+      return next({ ...state, step: 'detail', detailResourceId: intent.resourceId, apply: { ...state.apply, error: null } });
+
+    case 'detailBusyChanged':
+      return next({ ...state, detailBusy: intent.busy });
+
+    case 'revisionApplyRequested': {
+      if (state.step !== 'detail' || state.detailBusy || state.detailResourceId !== intent.revision.resourceId || state.conversationId === null || state.applied.status !== 'ready' || state.apply.status === 'saving') return next(state);
+      const selection = state.selection.filter(item => item.resourceId !== intent.revision.resourceId);
+      const selected = editSelection(state, [...selection, intent.revision]);
+      return resourcesReducer(selected.state, { type: 'applyRequested', key: intent.key });
+    }
+
     case 'backToList':
-      if (state.form.status === 'saving') return next(state);
+      if (state.form.status === 'saving' || state.detailBusy || state.apply.status === 'saving') return next(state);
       // WF-14: cancel and back discard the input without registering.
-      return next({ ...state, step: 'list', form: emptySkillForm, fileSeq: state.fileSeq + 1 });
+      return next({ ...state, step: 'list', detailResourceId: null, form: emptySkillForm, fileSeq: state.fileSeq + 1 });
 
     case 'fieldChanged':
       if (state.form.status !== 'editing') return next(state);

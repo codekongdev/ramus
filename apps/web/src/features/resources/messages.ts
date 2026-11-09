@@ -31,7 +31,10 @@ export const resourcesMessages = {
   loadSkillFile: 'SKILL.md 불러오기',
   register: '등록',
   registering: '등록 중…',
+  detail: '상세·버전 이력',
 } as const;
+
+export const detailLabel = (name: string): string => `${name} 상세·버전 이력`;
 
 export const kindLabel = (kind: ResourceKind): string => {
   switch (kind) {

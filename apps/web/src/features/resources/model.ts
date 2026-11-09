@@ -50,7 +50,9 @@ export type ResourcesState = {
   readonly projectId: string;
   /** Null when no conversation is open: search and register work, applying does not. */
   readonly conversationId: string | null;
-  readonly step: 'list' | 'register';
+  readonly step: 'list' | 'register' | 'detail';
+  readonly detailResourceId: string | null;
+  readonly detailBusy: boolean;
   readonly query: string;
   /** Incremented per search; late results with an older sequence are dropped. */
   readonly searchSeq: number;
@@ -81,6 +83,9 @@ export type ResourcesIntent =
   | { readonly type: 'applySucceeded'; readonly items: readonly AppliedResource[] }
   | { readonly type: 'applyFailed'; readonly error: ApiError }
   | { readonly type: 'registerOpened' }
+  | { readonly type: 'detailOpened'; readonly resourceId: string }
+  | { readonly type: 'detailBusyChanged'; readonly busy: boolean }
+  | { readonly type: 'revisionApplyRequested'; readonly revision: SelectedRevision; readonly key: string }
   | { readonly type: 'backToList' }
   | { readonly type: 'fieldChanged'; readonly field: SkillField; readonly value: string }
   | { readonly type: 'fileChosen'; readonly file: File }
@@ -134,6 +139,8 @@ export function initialResourcesState(projectId: string, conversationId: string 
     projectId,
     conversationId,
     step: 'list',
+    detailResourceId: null,
+    detailBusy: false,
     query: '',
     searchSeq: 0,
     search: { status: 'loading' },

@@ -135,6 +135,57 @@ describe('selection', () => {
   });
 });
 
+describe('resource detail navigation and explicit apply', () => {
+  const revision = { resourceId: 'a', revisionId: 'a-v1', number: 1, name: 'name-a', kind: 'skill' } as const;
+
+  it('preserves search and staged versions while opening and leaving history', () => {
+    const start = run(ready([summary('a', 2), summary('b', 1)]),
+      { type: 'queryChanged', query: 'search' }, { type: 'toggled', resource: summary('b', 1) }).state;
+    const detail = run(start, { type: 'detailOpened', resourceId: 'a' });
+    expect(detail.state.step).toBe('detail');
+    expect(detail.state.detailResourceId).toBe('a');
+    expect(detail.effects).toEqual([]);
+    const returned = run(detail.state, { type: 'backToList' }).state;
+    expect(returned.query).toBe('search');
+    expect(returned.selection).toEqual(start.selection);
+    expect(returned.detailResourceId).toBeNull();
+  });
+
+  it('applies a historical revision while preserving all other selected resources', () => {
+    const start = ready([summary('a', 2), summary('b', 1)], [appliedItem('a', 2), appliedItem('b', 1)]);
+    const detail = run(start, { type: 'detailOpened', resourceId: 'a' }).state;
+    const requested = run(detail, { type: 'revisionApplyRequested', revision, key: 'history' });
+    expect(requested.effects).toEqual([{ type: 'apply', conversationId: C, revisionIds: ['b-v1', 'a-v1'], key: 'history' }]);
+    expect(requested.state.applied).toEqual(start.applied);
+    expect(run(requested.state, { type: 'backToList' }).state).toBe(requested.state);
+    const failed = run(requested.state, { type: 'applyFailed', error: businessError }).state;
+    expect(failed.step).toBe('detail');
+    const retried = run(failed, { type: 'revisionApplyRequested', revision, key: 'new-key' });
+    expect(retried.effects).toEqual(requested.effects);
+  });
+
+  it('blocks apply until applied versions load, for other resources, or while a revision is saving', () => {
+    const start = run(initialResourcesState(P, C), { type: 'detailOpened', resourceId: 'a' }).state;
+    expect(run(start, { type: 'revisionApplyRequested', revision, key: 'k' }).effects).toEqual([]);
+    const detail = run(ready([summary('a', 2)]), { type: 'detailOpened', resourceId: 'a' }).state;
+    expect(run(detail, { type: 'revisionApplyRequested', revision: { ...revision, resourceId: 'b' }, key: 'k' }).effects).toEqual([]);
+    const saving = run(detail, { type: 'detailBusyChanged', busy: true }).state;
+    expect(run(saving, { type: 'revisionApplyRequested', revision, key: 'k' }).effects).toEqual([]);
+    expect(run(saving, { type: 'backToList' }).state).toBe(saving);
+    expect(run(saving, { type: 'detailOpened', resourceId: 'b' }).state).toBe(saving);
+  });
+
+  it('only refreshes search when a version is saved and preserves the pinned selection', () => {
+    const start = run(ready([summary('a', 1)], [appliedItem('a', 1)]), { type: 'detailOpened', resourceId: 'a' }).state;
+    const event = { type: 'resource.updated', data: { project_id: P, resource_id: 'a', latest_revision_id: 'a-v2', latest_number: 2, occurred_at: '2026-11-09T00:00:00Z' } } as const;
+    const refreshed = run(start, { type: 'serverEvent', event });
+    expect(refreshed.state.selection).toEqual(start.selection);
+    expect(refreshed.state.applied).toEqual(start.applied);
+    expect(refreshed.state.step).toBe('detail');
+    expect(refreshed.effects.map(effect => effect.type)).toEqual(['search']);
+  });
+});
+
 describe('apply', () => {
   it('is disabled without a selection (WF-10: 선택 없이 적용하지 않는다)', () => {
     const state = ready([summary('a', 1)], [appliedItem('a', 1)]);
