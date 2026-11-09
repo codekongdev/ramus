@@ -1,4 +1,4 @@
-# ramus 계약 v1.2
+# ramus 계약 v1.3
 
 확정일: 2026-11-09 · 작업자: 메이슨, 헤이든 · 상태: 확정
 
@@ -70,6 +70,21 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 | `FILE_TYPE_UNSUPPORTED` | 422 | `.md`·`.txt`가 아니거나 UTF-8 텍스트가 아님(D9) |
 | `SHARE_TARGET_INVALID` | 422 | 보낼 대상이 없음(`conversation_ids`가 빈 목록이어도 `INVALID_INPUT`이 아니라 이 코드), 다른 프로젝트, 결과의 출처 대화 |
 | `PROJECT_CREATE_FORBIDDEN` | 403 | 대상 프로젝트에 대화를 만들 권한이 없음 |
+
+### 1.3 실행 실패 코드
+
+`Run`의 `error.code`로 내려가는 코드다. HTTP 응답의 오류 코드가 아니다. 실행기는 코드를 `run.error_code`에 저장하고, 응답을 만들 때 문구표로 `error.message`를 만든다. 게이트웨이가 아래 표에 없는 코드를 돌려주면 `LLM_UNAVAILABLE`로 저장한다.
+
+| 코드 | 상황 |
+|---|---|
+| `LLM_UNAVAILABLE` | 모델 호출 실패, 결과 반영 중 오류처럼 원인을 사용자에게 구분해 알릴 필요가 없는 실패 |
+| `LLM_OUTPUT_INVALID` | 모델 출력이 6.1의 스키마와 맞지 않음 |
+| `LLM_TIMEOUT` | 모델 응답이 제한 시간 안에 오지 않음 |
+| `RUN_INTERRUPTED` | running 상태에서 heartbeat가 끊김(서버 재시작 등). 자동으로 다시 실행하지 않는다(C8) |
+| `RUN_TIMED_OUT` | pending 상태로 너무 오래 대기함(F-03) |
+| `RUN_CREDENTIAL_MISMATCH` | 핸들러가 만든 모델 요청의 키 계정이 실행의 `credential_account_id`와 다름. 모델을 호출하지 않는다(ON-AC-08) |
+
+재시도할 수 있는지는 실패 코드가 아니라 상태로만 판단한다. failed·cancelled 실행은 코드와 관계없이 요청자가 재시도할 수 있다. `RunError.retryable`은 핸들러에 넘기는 값이며 DB에는 저장하지 않는다.
 
 ## 2. 공통 데이터 형태
 
@@ -194,7 +209,9 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 
 실패 정보는 `error_code`와 `error_params`로만 저장한다. `error_params`는 문구에 들어갈 값(예: 실패한 자료 이름)만 담고, 문장은 응답을 만들 때 요청 언어의 문구표로 만든다. 모델 제공자의 원문 오류 같은 운영용 상세 원인은 DB에 저장하지 않고 서버 로그에만 남긴다.
 
-`run.input_snapshot`에는 실행에 실제로 쓴 메시지 범위(`message_from_seq`, `message_to_seq`), 자원 버전 ID 목록, 결론 버전 ID 목록을 기록한다. 스냅샷은 실행을 등록하는 시점에 만든다. 이후 설정이 바뀌어도 그 실행의 입력은 바뀌지 않는다.
+`run.input_snapshot`에는 실행에 실제로 쓴 메시지 범위(`message_from_seq`, `message_to_seq`), 자원 버전 ID 목록, 결론 버전 ID 목록을 기록한다. 스냅샷은 실행기가 실행을 점유하는 트랜잭션에서 만들고, 같은 트랜잭션에서 그 컨텍스트로 모델 요청을 만든다. 그래서 기록된 버전 ID와 실제 입력이 항상 같다. 등록할 때는 빈 스냅샷을 저장한다. 실행이 시작된 뒤에는 설정이 바뀌어도 그 실행의 입력이 바뀌지 않는다. 재시도하면 새 시도를 점유할 때 다시 기록한다. 메시지 범위는 work 핸들러를 만들 때(A2) 넘기는 방법을 정하며, 그전까지는 null이다.
+
+`run.heartbeat_at`은 running 상태에서는 실행기가 마지막으로 보낸 생존 신호의 시각이다. 재시도로 pending에 돌아간 실행에서는 다시 대기열에 들어간 시각이다. pending 장기 대기는 `COALESCE(heartbeat_at, created_at)`을 기준으로 판정한다.
 
 ## 6. 백엔드 포트
 
@@ -265,6 +282,13 @@ class ResultUsageQuery(Protocol):
 
 실행기는 대기 중인 실행을 점유한 뒤 `RunPurposeHandler.build_request`로 모델 요청을 만들고, 트랜잭션 밖에서 `LlmGateway`를 호출한다. 결과는 새 트랜잭션에서 `complete` 또는 `fail`로 넘긴다. `RunView`, `RunError`, `LlmRequest`, `LlmGateway`는 execution 모듈의 공개 타입이다.
 
+핸들러를 구현할 때 아래 동작을 전제로 한다.
+
+- `ContextProvider.snapshot`은 점유 트랜잭션에서 한 번 호출되고, 그 결과가 `build_request`의 `context`로 그대로 넘어간다(5장).
+- `fail`은 실행 상태를 failed로 바꾸는 트랜잭션 안에서 호출된다. 시작하지 않은 실행(`RUN_TIMED_OUT`)과 heartbeat가 끊긴 실행(`RUN_INTERRUPTED`)에도 호출된다. `fail`이 예외를 던지면 핸들러의 쓰기만 롤백되고 실행은 failed로 남는다.
+- 취소할 때는 핸들러를 호출하지 않고 `run.updated`만 발행한다.
+- 취소되었거나 복구 처리된 실행에 늦게 도착한 모델 결과는 버리며, 이때 `complete`는 호출되지 않는다.
+
 ### 6.1 모델 출력 스키마
 
 모델 출력은 JSON 스키마로 받고 경계에서 검증한다. 검증에 실패하면 실행을 failed로 처리하고 재시도할 수 있게 한다.
@@ -283,6 +307,7 @@ class ResultUsageQuery(Protocol):
 |---|---|---|---|
 | `CredentialProvider.get_api_key(account_id)` | access | execution | 실행 직전에만 키를 복호화해 돌려준다. 로그·이벤트에 남기지 않는다 |
 | `ConversationWriter.append_message(...)`, `create_child(...)` | conversations | execution | AI 답변 저장, 분기 시 자식 대화 생성 |
+| `AiConnectionQuery.is_connected(session, account_id)` | access | execution | 실행을 등록하거나 재시도할 때 키 연결 여부만 확인한다. execution은 `ai_connection` 테이블을 직접 읽지 않는다 |
 
 ## 7. 프론트엔드 연결 규칙
 
@@ -320,11 +345,12 @@ export type TaskModalProps = {
 | D10 | 프로젝트 관계 보기(WF-13)를 MVP에 포함한다 |
 | C1 | 성공 응답은 감싸지 않고, 목록은 `{items}`, 변경 응답은 항상 JSON 객체 |
 | C2 | JSON 필드는 `snake_case` |
-| C3 | 실행 입력 스냅샷은 실행을 등록하는 시점에 만든다 |
+| C3 | 실행 입력 스냅샷은 실행기가 실행을 점유하는 시점에 만든다(v1.3에서 등록 시점을 변경) |
 | C4 | SSE는 지난 이벤트를 다시 보내지 않고, 클라이언트가 연결마다 상태를 다시 조회한다 |
 | C5 | 결과 초안은 생성된 내용만 서버에 저장하고, 편집 중 내용은 저장 버튼을 누를 때 기준 버전과 함께 보낸다 |
 | C6 | AI 실행 요청이 거절되면(키 없음, 활성 실행 있음) 메시지를 저장하지 않고 클라이언트가 입력 초안을 유지한다 |
 | C7 | 작업 중단·재시도는 그 작업을 요청한 계정만 할 수 있다 |
+| C8 | heartbeat가 끊긴 실행은 자동으로 다시 실행하지 않고 재시도할 수 있는 failed로 둔다. 사용자 동의 없이 요청자의 키로 비용이 다시 나가지 않게 하기 위해서다 |
 
 ## 변경 이력
 
@@ -333,3 +359,4 @@ export type TaskModalProps = {
 | 2026-11-09 | v1 | 최초 확정. P0-A1·P0-B1에서 정해진 항목을 반영 |
 | 2026-11-09 | v1.2 | P0-A3 구현에 맞춰 보완: 실제 이름은 `contracts/openapi.json` 기준, 빈 본문 변경 요청, `NOT_IMPLEMENTED`, 빈 보낼 대상 목록의 오류 코드 |
 | 2026-11-09 | v1.1 | `task`·`run`의 `error_message`를 `error_params`(JSONB)로 바꾸고 `result_draft`에도 추가. 사용자에게 보여 줄 문장을 DB에 저장하지 않는 규칙 추가(로드맵 9.3-1) |
+| 2026-11-09 | v1.3 | A4 실행기 구현에 맞춰 보완: 실행 실패 코드(1.3), 입력 스냅샷 기록 시점을 점유 시점으로 변경(C3), pending 상태의 `heartbeat_at` 의미, 핸들러 호출 조건(6장), `AiConnectionQuery`(6.2), 자동 재실행 금지(C8) |
