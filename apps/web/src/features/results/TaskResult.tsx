@@ -19,10 +19,11 @@ export function SummaryAction({ controller, onShowResult }: { readonly controlle
   </Button>;
 }
 
-export function TaskResultTab({ controller, onOpenConclusion, sendButtonRef, ...actions }: ConclusionActions & {
+export function TaskResultTab({ controller, onOpenConclusion, sendButtonRef, createButtonRef, ...actions }: ConclusionActions & {
   readonly controller: TaskResultController;
   readonly onOpenConclusion?: (revision: ResultRevision) => void;
   readonly sendButtonRef?: Ref<HTMLButtonElement>;
+  readonly createButtonRef?: Ref<HTMLButtonElement>;
 }) {
   const { state, dispatch, save } = controller;
   const busy = state.mutation !== null;
@@ -60,7 +61,7 @@ export function TaskResultTab({ controller, onOpenConclusion, sendButtonRef, ...
       <div className="task-result__heading"><h3>{messages.approved}</h3><Badge>{messages.version(viewed.version)}</Badge>
         {!state.editor && viewed.id === state.approved?.id && <Button variant="outline" disabled={busy || active} onClick={() => dispatch({ type: 'editApproved' })}>{messages.edit}</Button>}
       </div>
-      <ConclusionView revision={viewed} sendButtonRef={sendButtonRef} {...actions} />
+      <ConclusionView revision={viewed} sendButtonRef={sendButtonRef} createButtonRef={createButtonRef} {...actions} />
       {onOpenConclusion && <Button variant="ghost" onClick={() => onOpenConclusion(viewed)}>{messages.viewConclusion}</Button>}
       <p className="task-result__hint"><time dateTime={viewed.created_at}>{formatDateTime(viewed.created_at, DEFAULT_LOCALE)}</time></p>
       <details className="task-result__source"><summary>{messages.source}</summary><p>{messages.sourceRange(viewed.source.message_from_seq, viewed.source.message_to_seq)}</p><p>{messages.sourceResources(viewed.source.resource_revision_ids.length)}</p></details>

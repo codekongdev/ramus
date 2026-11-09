@@ -18,10 +18,12 @@ export type TaskModalProps = {
   readonly client?: AppApi;
   readonly ensureAiConnection?: () => Promise<boolean>;
   readonly onTaskChanged?: (task: Task) => void;
+  /** Replaces this dialog's body for a result action while retaining its size and task state. */
+  readonly contentOverride?: { readonly title: string; readonly body: ReactNode };
 };
 
 /** Viewing or closing a task never cancels its server execution. */
-export function TaskModal({ taskId, onClose, renderHeaderActions, renderResultTab, client = api, ensureAiConnection, onTaskChanged }: TaskModalProps) {
+export function TaskModal({ taskId, onClose, renderHeaderActions, renderResultTab, client = api, ensureAiConnection, onTaskChanged, contentOverride }: TaskModalProps) {
   const handler = useMemo(() => makeTaskModalEffectHandler(client, ensureAiConnection), [client, ensureAiConnection]);
   const [state, dispatch] = useStore(taskModalReducer, () => initialTaskModalState(taskId), handler);
   const [tab, setTab] = useState('conversation');
@@ -83,8 +85,9 @@ export function TaskModal({ taskId, onClose, renderHeaderActions, renderResultTa
   );
 
   return (
-    <Dialog open title={task?.title ?? messages.loadingTitle} onOpenChange={open => { if (!open) onClose(); }} className="task-modal"
-      headerActions={task && <><TaskStatusBadge status={task.status} />{task.status === 'ready' && renderHeaderActions(task, { showResultTab: () => setTab('result') })}</>}>
+    <Dialog open title={contentOverride?.title ?? task?.title ?? messages.loadingTitle} onOpenChange={open => { if (!open) onClose(); }} className="task-modal"
+      headerActions={!contentOverride && task && <><TaskStatusBadge status={task.status} />{task.status === 'ready' && renderHeaderActions(task, { showResultTab: () => setTab('result') })}</>}>
+      {contentOverride ? contentOverride.body : <>
       {state.loading && !task && <p role="status"><Spinner /> {messages.loading}</p>}
       {state.error && <div className="task-modal__error" role="alert"><p>{state.error}</p><Button variant="outline" disabled={state.loading} onClick={() => dispatch({ type: 'refresh' })}>{messages.retryLoad}</Button></div>}
       {state.mutationError && <p className="task-modal__error" role="alert">{state.mutationError}</p>}
@@ -92,6 +95,7 @@ export function TaskModal({ taskId, onClose, renderHeaderActions, renderResultTa
         { value: 'conversation', label: messages.conversationTab, content: conversation },
         { value: 'result', label: messages.resultTab, content: renderResultTab(task, { closeModal: onClose }) },
       ]} />}
+      </>}
     </Dialog>
   );
 }

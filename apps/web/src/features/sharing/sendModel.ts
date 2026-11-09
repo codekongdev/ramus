@@ -1,9 +1,9 @@
 import { next, type Next } from '../../lib/mvi';
-import type { ResultRevision } from '../../lib/api/result-contract';
+import type { ConclusionRevision } from '../../lib/api/result-contract';
 import type { Conversation, ShareOutcomes } from './contract';
 import { sharingMessages as m } from './messages';
 
-export type SendTarget = { readonly projectId: string; readonly currentConversationId: string; readonly revision: ResultRevision };
+export type SendTarget = { readonly projectId: string; readonly currentConversationId: string; readonly revision: ConclusionRevision };
 export type SendMutation = { readonly key: string; readonly revisionId: string; readonly conversationIds: string[] };
 export type SendState = {
   readonly target: SendTarget | null;

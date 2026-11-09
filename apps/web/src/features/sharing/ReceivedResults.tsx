@@ -1,5 +1,6 @@
 import { useEffect, useMemo, type ReactNode, type Ref } from 'react';
-import type { components } from '../../api/schema';
+import type { ConclusionRevision } from '../../lib/api/result-contract';
+import { sharingMessages as conversationMessages } from './conversationMessages';
 import { api, type AppApi } from '../../lib/api';
 import { useStore } from '../../lib/mvi';
 import { useProjectEventListener, useResyncListener } from '../../lib/realtime';
@@ -11,7 +12,6 @@ import { initialReceivedState, initialRevisionState, receivedReducer, revisionRe
 import { SendConclusion, useSendConclusion } from './SendConclusion';
 import './sharing.css';
 
-type ResultRevision = components['schemas']['ResultRevision'];
 
 export function ReceivedResults({ conversationId, onOpen, client = api }: {
   readonly conversationId: string; readonly onOpen: (input: ConversationInput) => void; readonly client?: AppApi;
@@ -21,22 +21,22 @@ export function ReceivedResults({ conversationId, onOpen, client = api }: {
   useEffect(() => { dispatch({ type: 'select', conversationId }); }, [conversationId, dispatch]);
   useProjectEventListener(event => dispatch({ type: 'event', event }));
   useResyncListener(() => dispatch({ type: 'refresh' }));
-  return <div className="received-results">
+  return <section className="received-results" aria-label={conversationMessages.linked}>
     <h2>{m.received}</h2>
     {state.loading && state.items.length === 0 && <p className="sharing-hint" role="status"><Spinner label={m.loadingInputs} /> {m.loadingInputs}</p>}
     {state.error && <div role="alert"><p>{state.error}</p><Button variant="outline" disabled={state.loading} onClick={() => dispatch({ type: 'refresh' })}>{m.retry}</Button></div>}
     {!state.loading && !state.error && state.items.length === 0 && <p className="sharing-hint">{m.empty}</p>}
     <ul className="received-results__list">{state.items.map(item => <li key={item.id}>
-      <Button variant="ghost" className="received-results__row" onClick={() => onOpen(item)}><span className="sharing-title">{item.title}</span>
+      <Button variant="ghost" className="received-results__row" aria-label={conversationMessages.openInput(item.title, item.version)} onClick={() => onOpen(item)}><span className="sharing-title">{item.title}</span>
         <span className="received-results__versions"><Badge>{m.version(item.version)}</Badge>{item.latest_version > item.version && <Badge>{m.newer}</Badge>}</span>
       </Button>
     </li>)}</ul>
-  </div>;
+  </section>;
 }
 
 export function ReceivedResultDialog({ projectId, input, onClose, renderConclusion, client = api }: {
   readonly projectId: string; readonly input: ConversationInput; readonly onClose: () => void; readonly client?: AppApi;
-  readonly renderConclusion: (revision: ResultRevision, controls: {
+  readonly renderConclusion: (revision: ConclusionRevision, controls: {
     readonly onSendToConversation: () => void;
     readonly sendButtonRef: Ref<HTMLButtonElement>;
   }) => ReactNode;

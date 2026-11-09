@@ -1,13 +1,13 @@
 """Sharing owns its send history and one pinned snapshot per result/destination pair."""
 
-from dataclasses import asdict
+from dataclasses import asdict, is_dataclass
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from ramus_api.modules.results.public import Revision
+from ramus_api.modules.results.public import ApprovedConclusion, Revision
 from ramus_api.modules.sharing.domain.models import InputOrigin
 from ramus_api.modules.sharing.domain.records import PinnedInput, ShareOutcome, share_outcome
 from ramus_api.modules.sharing.infrastructure.models import ConversationInputRow, ShareRow
@@ -30,7 +30,7 @@ def _input(row: ConversationInputRow) -> PinnedInput:
 
 
 class SqlSharingRepository:
-    def pin(self, session: Session, conversation_id: UUID, revision: Revision, actor_id: UUID) -> ShareOutcome:
+    def pin(self, session: Session, conversation_id: UUID, revision: Revision | ApprovedConclusion, actor_id: UUID) -> ShareOutcome:
         row = session.scalar(select(ConversationInputRow).where(
             ConversationInputRow.conversation_id == conversation_id,
             ConversationInputRow.result_id == revision.result_id,
@@ -43,7 +43,8 @@ class SqlSharingRepository:
             return outcome
         values = dict(result_revision_id=revision.id, version=revision.version,
                       title_snapshot=revision.title, conclusion_snapshot=revision.conclusion,
-                      source_snapshot=_json(asdict(revision.source)), origin="share", created_by=actor_id,
+                      source_snapshot=_json(asdict(revision.source) if is_dataclass(revision.source) else revision.source),
+                      origin="share", created_by=actor_id,
                       updated_at=utc_now())
         if row is None:
             session.add(ConversationInputRow(id=new_id(), conversation_id=conversation_id,

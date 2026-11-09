@@ -89,7 +89,7 @@ test('sends a pinned conclusion to multiple conversations, forwards it, and expl
   const receivedDialog = receiver.getByRole('dialog', { name: revision1.title, exact: true });
   await expect(receivedDialog).toContainText(revision1.conclusion);
   await expect(receivedDialog.getByText('출처 정보', { exact: true })).toHaveCount(0);
-  await expect(receivedDialog.getByRole('button', { name: '새 대화 만들기', exact: true })).toBeDisabled();
+  await expect(receivedDialog.getByRole('button', { name: '새 대화 만들기', exact: true })).toBeEnabled();
   const receivedActions = receivedDialog.locator('.conclusion-view__actions button');
   await expect(receivedActions).toHaveCount(2);
   expect(await receivedActions.nth(0).getAttribute('class')).toBe(await receivedActions.nth(1).getAttribute('class'));
@@ -97,11 +97,15 @@ test('sends a pinned conclusion to multiple conversations, forwards it, and expl
   expect(receiverMutations).toBe(0);
   await received(receiver).getByRole('button', { name: /경쟁사 분석/ }).click();
   await receivedDialog.getByRole('button', { name: '다른 대화에 보내기', exact: true }).click();
+  await receivedDialog.getByRole('button', { name: '결론으로 돌아가기', exact: true }).click();
+  await expect(receivedDialog.getByRole('button', { name: '다른 대화에 보내기', exact: true })).toBeFocused();
+  await receivedDialog.getByRole('button', { name: '다른 대화에 보내기', exact: true }).click();
   await receivedDialog.getByLabel('대화 검색', { exact: true }).fill(prefix);
   await expect(receivedDialog.getByRole('checkbox', { name: targetA.title, exact: false })).toHaveCount(0);
   await receivedDialog.getByRole('checkbox', { name: targetC.title, exact: false }).check();
   await receivedDialog.getByRole('button', { name: '보내기', exact: true }).click();
   await expect(receivedDialog.getByRole('button', { name: '다른 대화에 보내기', exact: true })).toBeVisible();
+  await expect(receivedDialog.getByRole('button', { name: '다른 대화에 보내기', exact: true })).toBeFocused();
   expect((await inputs(page, targetC.id)).find(input => input.result_id === revision1.result_id)?.result_revision_id).toBe(revision1.id);
   await receivedDialog.getByRole('button', { name: '닫기', exact: true }).click();
 

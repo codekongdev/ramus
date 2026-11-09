@@ -2,7 +2,7 @@ from typing import Protocol, TypeVar
 from uuid import UUID
 
 from ramus_api.modules.conversations.public import ConversationRecord
-from ramus_api.modules.results.public import ResultRecord, Revision
+from ramus_api.modules.results.public import ApprovedConclusion, ResultRecord, Revision
 from ramus_api.modules.sharing.domain.models import ResultUsage
 from ramus_api.modules.sharing.domain.records import PinnedInput, ShareOutcome
 
@@ -17,7 +17,7 @@ class SharingRepository(Protocol[TransactionT]):
     """The caller holds the source result lock for the complete send transaction."""
 
     def pin(
-        self, session: TransactionT, conversation_id: UUID, revision: Revision, actor_id: UUID,
+        self, session: TransactionT, conversation_id: UUID, revision: Revision | ApprovedConclusion, actor_id: UUID,
     ) -> ShareOutcome: ...
     def list_inputs(self, session: TransactionT, conversation_id: UUID) -> tuple[PinnedInput, ...]: ...
 
