@@ -1,7 +1,12 @@
+export { api } from './app';
+export type { AppApi } from './app';
+export { apiMessages } from './messages';
 export {
   IDEMPOTENCY_HEADER,
+  acceptLanguageMiddleware,
   createApiClient,
   idempotencyMiddleware,
+  jsonContentTypeMiddleware,
   newIdempotencyKey,
   toResult,
 } from './client';

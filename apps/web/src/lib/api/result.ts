@@ -1,3 +1,5 @@
+import { apiMessages } from './messages';
+
 /**
  * API call outcome. Business errors (4xx) and system errors (5xx, network) are kept apart
  * (CONVENTIONS.md 오류 규칙). Per contracts.md 7장, business errors show the server's
@@ -13,6 +15,7 @@ export type KnownErrorCode =
   | 'CONFLICT'
   | 'INTERNAL_ERROR'
   | 'INVALID_INPUT'
+  | 'NOT_IMPLEMENTED'
   | 'IDEMPOTENCY_KEY_INVALID'
   | 'IDEMPOTENCY_CONFLICT'
   | 'AUTH_CODE_INVALID'
@@ -82,8 +85,8 @@ export const isConflict = (error: ApiError) => error.kind === 'business' && erro
 export const isUnauthorized = (error: ApiError) => error.kind === 'business' && error.status === 401;
 export const isNotFound = (error: ApiError) => error.kind === 'business' && error.status === 404;
 
-export const SYSTEM_ERROR_MESSAGE = '요청을 처리하는 중에 문제가 생겼습니다. 잠시 후 다시 시도해 주세요.';
-export const NETWORK_ERROR_MESSAGE = '서버에 연결할 수 없습니다. 네트워크 연결을 확인해 주세요.';
+export const SYSTEM_ERROR_MESSAGE = apiMessages.systemError;
+export const NETWORK_ERROR_MESSAGE = apiMessages.networkError;
 
 /**
  * Text to show the user. Returns null for `aborted`, which is not a failure the user caused

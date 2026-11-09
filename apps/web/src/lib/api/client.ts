@@ -1,4 +1,5 @@
 import createClient, { type Client, type Middleware } from 'openapi-fetch';
+import { DEFAULT_LOCALE, type Locale } from '../locale';
 import { toHttpError, toThrownError, type ApiResult } from './result';
 
 export const IDEMPOTENCY_HEADER = 'Idempotency-Key';
@@ -10,13 +11,15 @@ export interface ApiClientOptions {
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
   newIdempotencyKey?: () => string;
+  /** Current screen language, sent as `Accept-Language` (roadmap 9.2). */
+  getLocale?: () => Locale;
 }
 
 /**
- * Adds an `Idempotency-Key` to every mutating request that doesn't carry one (부록 A:
- * 모든 변경 요청은 Idempotency-Key 헤더를 받는다). A generated key only protects against
- * the network layer replaying one request; to retry a user action safely, create the key
- * once with `newIdempotencyKey()` and pass it in `headers` on every attempt.
+ * Adds an `Idempotency-Key` to every mutating request that doesn't carry one (contracts.md
+ * 1장). A generated key only protects against the network layer replaying one request; the
+ * contract asks for one key per user action, so create it once with `newIdempotencyKey()`
+ * and pass it in `headers` on every retry of that action.
  */
 export function idempotencyMiddleware(newKey: () => string): Middleware {
   return {
@@ -24,6 +27,29 @@ export function idempotencyMiddleware(newKey: () => string): Middleware {
       if (!MUTATING_METHODS.has(request.method.toUpperCase())) return undefined;
       if (request.headers.has(IDEMPOTENCY_HEADER)) return undefined;
       request.headers.set(IDEMPOTENCY_HEADER, newKey());
+      return request;
+    },
+  };
+}
+
+/**
+ * Mutating requests must declare `Content-Type: application/json` (contracts.md 1장).
+ * Bodies are typed by the generated schema — endpoints whose request is `{}` require
+ * `body: {}` — so this only fills the header in for body-less calls such as DELETE.
+ */
+export const jsonContentTypeMiddleware: Middleware = {
+  onRequest({ request }) {
+    if (!MUTATING_METHODS.has(request.method.toUpperCase())) return undefined;
+    if (request.headers.has('Content-Type')) return undefined;
+    request.headers.set('Content-Type', 'application/json');
+    return request;
+  },
+};
+
+export function acceptLanguageMiddleware(getLocale: () => Locale): Middleware {
+  return {
+    onRequest({ request }) {
+      request.headers.set('Accept-Language', getLocale());
       return request;
     },
   };
@@ -41,7 +67,11 @@ export function createApiClient<Paths extends {}>(options: ApiClientOptions = {}
     credentials: 'same-origin',
     ...(options.fetch ? { fetch: options.fetch } : {}),
   });
-  client.use(idempotencyMiddleware(options.newIdempotencyKey ?? newIdempotencyKey));
+  client.use(
+    idempotencyMiddleware(options.newIdempotencyKey ?? newIdempotencyKey),
+    jsonContentTypeMiddleware,
+    acceptLanguageMiddleware(options.getLocale ?? (() => DEFAULT_LOCALE)),
+  );
   return client;
 }
 

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { paths } from '../../src/api/schema';
 import {
   IDEMPOTENCY_HEADER,
+  api,
   NETWORK_ERROR_MESSAGE,
   SYSTEM_ERROR_MESSAGE,
   createApiClient,
@@ -160,5 +162,62 @@ describe('error helpers', () => {
     expect(isUnauthorized(toHttpError(401, null))).toBe(true);
     expect(isConflict(toHttpError(401, null))).toBe(false);
     expect(isConflict(toHttpError(500, null))).toBe(false);
+  });
+});
+
+describe('contract headers', () => {
+  it('sends Content-Type on body-less mutations and Accept-Language on every request', async () => {
+    type WithDelete = TestPaths & {
+      '/api/items/{id}': {
+        delete: {
+          parameters: { path: { id: string } };
+          responses: { 200: { content: { 'application/json': object } } };
+        };
+      };
+    };
+    const requests: Request[] = [];
+    const client = createApiClient<WithDelete>({
+      baseUrl: 'http://ramus.test',
+      fetch: (async (input: Request) => {
+        requests.push(input);
+        return json(200, {});
+      }) as unknown as typeof fetch,
+      getLocale: () => 'en',
+    });
+    await client.DELETE('/api/items/{id}', { params: { path: { id: 'i1' } } });
+    await client.GET('/api/items/{id}', { params: { path: { id: 'i1' } } });
+    expect(requests[0]!.headers.get('Content-Type')).toBe('application/json');
+    expect(requests[0]!.headers.get(IDEMPOTENCY_HEADER)).toBeTruthy();
+    expect(requests[1]!.headers.has('Content-Type')).toBe(false);
+    expect(requests.map((r) => r.headers.get('Accept-Language'))).toEqual(['en', 'en']);
+  });
+
+  it('defaults Accept-Language to ko', async () => {
+    const { api: client, requests } = setup(() => json(200, { id: 'i1', title: 't' }));
+    await client.GET('/api/items/{id}', { params: { path: { id: 'i1' } } });
+    expect(requests[0]!.headers.get('Accept-Language')).toBe('ko');
+  });
+});
+
+describe('app client over the generated schema', () => {
+  it('requires an explicit {} body for empty-request endpoints and sends it as JSON', async () => {
+    const requests: Request[] = [];
+    const appApi = createApiClient<paths>({
+      baseUrl: 'http://ramus.test',
+      fetch: (async (input: Request) => {
+        requests.push(input);
+        return json(200, {});
+      }) as unknown as typeof fetch,
+    });
+    // @ts-expect-error logout's request body is EmptyRequest and must be passed (contracts.md 1장)
+    await appApi.POST('/api/auth/logout', {}).catch(() => undefined);
+    await appApi.POST('/api/auth/logout', { body: {} });
+    const sent = requests.at(-1)!;
+    expect(await sent.text()).toBe('{}');
+    expect(sent.headers.get('Content-Type')).toBe('application/json');
+  });
+
+  it('exposes the shared instance', () => {
+    expect(typeof api.GET).toBe('function');
   });
 });
