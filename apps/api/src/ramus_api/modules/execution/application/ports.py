@@ -30,6 +30,12 @@ class RunRequester(Protocol[TransactionT]):
     def request(self, session: TransactionT, request: RunRequest) -> RunRef: ...
 
 
+class AiConnectionQuery(Protocol[TransactionT]):
+    """Implemented by access (A3). The executor never reads the ``ai_connection`` table itself."""
+
+    def is_connected(self, session: TransactionT, account_id: UUID) -> bool: ...
+
+
 class RunPurposeHandler(Protocol[TransactionT]):
     purpose: str
 
