@@ -1,0 +1,8 @@
+/* Full-page screens outside the workspace shell (login, not found). Layout only. */
+.app-page {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  background: var(--background);
+  color: var(--foreground);
+}
