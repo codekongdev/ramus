@@ -4,22 +4,15 @@
  *
  * Events carry identifiers and changed state only; features re-read resources as needed.
  */
+import type { components } from '../api/schema';
 
-export interface ConversationPayload {
-  readonly id: string;
-  readonly project_id: string;
-  readonly parent_id: string | null;
-  readonly task_id: string | null;
-  readonly title: string;
-  readonly path: readonly string[];
-  readonly created_by: string;
-  readonly created_at: string;
-}
-
-export type RunPurpose = 'work' | 'summary';
-export type RunStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
-export type TaskStatus = 'pending' | 'running' | 'ready' | 'failed' | 'cancelled';
-export type ResultDraftStatus = 'generating' | 'ready' | 'failed';
+// Shapes shared with the REST API come from the generated contract, not hand copies.
+type Schemas = components['schemas'];
+export type ConversationPayload = Schemas['Conversation'];
+export type RunPurpose = Schemas['Run']['purpose'];
+export type RunStatus = Schemas['Run']['status'];
+export type TaskStatus = Schemas['Task']['status'];
+export type ResultDraftStatus = Schemas['ResultDraft']['status'];
 
 interface EventDataMap {
   'member.joined': {
@@ -149,10 +142,23 @@ function reader(type: string): Reader {
   return self;
 }
 
-const RUN_PURPOSES = ['work', 'summary'] as const;
-const RUN_STATUSES = ['pending', 'running', 'succeeded', 'failed', 'cancelled'] as const;
-const TASK_STATUSES = ['pending', 'running', 'ready', 'failed', 'cancelled'] as const;
-const DRAFT_STATUSES = ['generating', 'ready', 'failed'] as const;
+/**
+ * Runtime lists for validation. `satisfies` + the exhaustiveness checks below make
+ * typecheck fail if the generated enums gain or lose a value.
+ */
+const RUN_PURPOSES = ['work', 'summary'] as const satisfies readonly RunPurpose[];
+const RUN_STATUSES = ['pending', 'running', 'succeeded', 'failed', 'cancelled'] as const satisfies readonly RunStatus[];
+const TASK_STATUSES = ['pending', 'running', 'ready', 'failed', 'cancelled'] as const satisfies readonly TaskStatus[];
+const DRAFT_STATUSES = ['generating', 'ready', 'failed'] as const satisfies readonly ResultDraftStatus[];
+
+type Exhaustive<Listed, All> = [All] extends [Listed] ? true : never;
+const _enumsCoverSchema: [
+  Exhaustive<(typeof RUN_PURPOSES)[number], RunPurpose>,
+  Exhaustive<(typeof RUN_STATUSES)[number], RunStatus>,
+  Exhaustive<(typeof TASK_STATUSES)[number], TaskStatus>,
+  Exhaustive<(typeof DRAFT_STATUSES)[number], ResultDraftStatus>,
+] = [true, true, true, true];
+void _enumsCoverSchema;
 
 type Decoders = {
   [T in ProjectEventType]: (r: Reader, data: Record<string, unknown>) => EventDataMap[T];
