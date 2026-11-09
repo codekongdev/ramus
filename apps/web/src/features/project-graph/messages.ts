@@ -1,0 +1,15 @@
+export const projectGraphMessages = {
+  title: '프로젝트 구조',
+  description: '대화의 분기와 결론 사용 관계를 확인합니다.',
+  refresh: '새로고침',
+  legend: '관계 범례',
+  branch: '분기',
+  usage: '결론 사용',
+  loading: '구조를 불러오는 중입니다.',
+  retry: '다시 시도',
+  empty: '아직 대화가 없습니다.',
+  emptyHint: '대화를 만들면 여기에 표시됩니다.',
+  map: '프로젝트 관계 지도',
+  relations: '관계 텍스트로 보기',
+  noRelations: '표시할 관계가 없습니다.',
+} as const;

@@ -12,6 +12,7 @@ import { navigate } from '../routing/useRoute';
 import { ResourcesMenuButton } from '../../features/resources';
 import { ReceivedResults, ReceivedResultDialog, SendConclusion, useSendConclusion, type ConversationInput } from '../../features/sharing';
 import { ResultsLibraryMenuButton } from '../../features/results-library';
+import { ProjectGraphMenuButton } from '../../features/project-graph';
 import { NewConversationPanel } from '../../features/sharing';
 import { sharingMessages } from '../../features/sharing/conversationMessages';
 import type { ConclusionRevision } from '../../lib/api/result-contract';
@@ -131,6 +132,7 @@ export function WorkspacePage({
     workspaceMenu={slots?.workspaceMenu ?? <>
       <ResultsLibraryMenuButton projectId={projectId} />
       <ResourcesMenuButton projectId={projectId} conversationId={conversationId} />
+      <ProjectGraphMenuButton projectId={projectId} onOpenTask={openTask} onSelectConversation={selectConversation} />
     </>}
     conversation={slots?.conversation ?? <Conversation projectId={projectId} conversationId={conversationId} ensureAiConnection={ensureAiConnection} />}
     conversationTree={projectId && <TaskConversationTree projectId={projectId} conversationId={conversationId}

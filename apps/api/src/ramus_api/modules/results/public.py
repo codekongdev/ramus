@@ -29,6 +29,11 @@ class ResultReader:
     def revision(self, session: Session, revision_id: UUID) -> Revision | None:
         return self._repository.revision(session, revision_id)
 
+    def source_conversations(self, session: Session, result_ids: tuple[UUID, ...]) -> dict[UUID, UUID]:
+        return dict(session.execute(select(ResultRow.id, ResultRow.source_conversation_id).where(
+            ResultRow.id.in_(result_ids),
+        )).all())
+
     def latest_versions(self, session: Session, result_ids: tuple[UUID, ...]) -> dict[UUID, int]:
         return dict(session.execute(select(ResultRow.id, ResultRow.latest_version).where(
             ResultRow.id.in_(result_ids),
