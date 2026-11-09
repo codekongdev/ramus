@@ -9,7 +9,7 @@
 - 과거 버전을 선택해도 그 버전의 제목·본문·출처가 고정된다. 다른 프로젝트에 원본 메시지·스킬·자료를 복사하지 않으며 생성만으로 AI를 실행하지 않는다.
 - 원본 접근 권한이 없는 수신자도 자신이 받은 결론 버전은 열고 새 대화의 입력으로 사용할 수 있다. 상세 조회는 수신 대화와 입력 ID를 함께 확인하며 저장된 스냅샷만 반환한다. 원본의 다른 버전·대화·자료 접근 권한은 부여하지 않는다.
 - 생성 실패 시 제목과 결론을 유지한다. 대상 권한이 바뀌면 프로젝트를 다시 선택하도록 안내한다. 뒤로가기는 결론 보기로 돌아간다.
-- 일반적인 다른 대화로 보내기(B6)와 프로젝트 전체 결과물 목록(B8)은 별도 기능이다.
+- 다른 프로젝트에서 가져온 결론도 받은 프로젝트 안의 다른 대화에 고정 버전 그대로 보낼 수 있다. 받지 않은 최신 버전이나 새로운 프로젝트로의 직접 전송 권한은 부여하지 않는다.
 
 ## API
 
@@ -24,8 +24,8 @@
 
 | 기준 | 검증 파일 |
 |---|---|
-| AC-11, ON-AC-12: 프로젝트 검색·권한 변경 | `apps/api/tests/test_result_followups_integration.py`, `apps/web/tests/sharing-model.test.ts`, `tests/e2e/result-conversation.spec.ts` |
-| AC-12: 최상위 생성·성공 후 이동·멱등 재시도 | 같은 API 통합 테스트, `apps/web/tests/sharing-effects.test.ts`, B7 E2E |
+| AC-11, ON-AC-12: 프로젝트 검색·권한 변경 | `apps/api/tests/test_result_followups_integration.py`, `apps/web/tests/result-conversation-model.test.ts`, `tests/e2e/result-conversation.spec.ts` |
+| AC-12: 최상위 생성·성공 후 이동·멱등 재시도 | 같은 API 통합 테스트, `apps/web/tests/result-conversation-effects.test.ts`, B7 E2E |
 | AC-13: 선택 버전 하나·다른 자원 복사 없음·AI 자동 실행 없음 | API 통합 테스트의 DB·ContextProvider 검증, 실제 서버 B7 E2E |
 | 받은 결론 재사용·원본 접근 격리 | API 통합 테스트의 수신자 권한·저장 스냅샷 검증, `apps/web/tests/sharing-received.test.ts`, 수신자 B7 E2E |
 

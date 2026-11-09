@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { paths } from '../src/api/schema';
 import { createApiClient, SYSTEM_ERROR_MESSAGE } from '../src/lib/api';
-import { parseInputDetail, type InputDetail } from '../src/features/sharing/input-contract';
+import { parseInputDetail, type InputDetail } from '../src/features/sharing/contract';
 import { initialRevisionState, revisionReducer } from '../src/features/sharing/receivedModel';
 import { makeRevisionEffectHandler } from '../src/features/sharing/receivedEffects';
 import { revision } from './results-fixtures';

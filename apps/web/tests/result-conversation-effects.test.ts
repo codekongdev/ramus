@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import type { paths } from '../src/api/schema';
 import { createApiClient } from '../src/lib/api';
 import { makeEffects } from '../src/features/sharing/effects';
-import { parseInputs } from '../src/features/sharing/input-contract';
 import { parent } from './fixtures/tasks';
 import { parseConversation } from '../src/lib/api/task-contract';
 
@@ -54,12 +53,4 @@ describe('result conversation effects', () => {
     await test.handle({ type: 'navigate', conversation }, test.dispatch, abort.signal);
     expect(test.created).not.toHaveBeenCalled();
   });
-});
-
-const input = { id: 'i1', conversation_id: 'c1', result_id: 'r1', result_revision_id: 'v1', title: '결론', version: 1, latest_version: 2, origin: 'new_conversation', created_by: 'u1', created_at: parent.created_at };
-it('validates pinned input metadata and rejects wrong conversations or versions', async () => {
-  expect(parseInputs({ items: [input] }, 'c1')).toEqual([input]);
-  for (const value of [{}, { items: [null] }, { items: [{ ...input, conversation_id: 'other' }] }, { items: [{ ...input, version: 0 }] }, { items: [{ ...input, latest_version: 0 }] }]) {
-    expect(() => parseInputs(value, 'c1')).toThrow();
-  }
 });

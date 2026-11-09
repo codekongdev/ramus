@@ -34,7 +34,7 @@ def register(
     CurrentAccount = Annotated[AuthenticatedAccount, Depends(require_account(container))]
     sharing = SharingService(
         SqlSharingRepository(), ResultReader(), ConversationReader(), container.project_access,
-        CommittedEvents(container),
+        CommittedEvents(container), memberships, SqlConversationInputs(),
     )
     followups = FollowupService(
         container.database.transaction, memberships, SqlFollowupConversations(),

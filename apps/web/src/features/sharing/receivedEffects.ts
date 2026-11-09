@@ -1,6 +1,6 @@
 import { errorMessage, SYSTEM_ERROR_MESSAGE, toResult, type AppApi } from '../../lib/api';
 import type { EffectHandler } from '../../lib/mvi';
-import { parseInputDetail } from './input-contract';
+import { parseInputDetail } from './contract';
 import { parseInputs } from './contract';
 import type { ReceivedEffect, ReceivedIntent, RevisionEffect, RevisionIntent } from './receivedModel';
 

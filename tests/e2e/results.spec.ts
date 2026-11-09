@@ -286,12 +286,16 @@ test('conclusion reading preserves the parent draft, route and scroll and never 
   await taskDialog.getByRole('button', { name: '결론 보기', exact: true }).click();
   const reader = page.locator('dialog[open]');
   await expect(reader).toContainText('고정된 결론');
-  await expect(reader.getByRole('button', { name: '새 대화 만들기', exact: true })).toBeDisabled();
+  await expect(reader.getByRole('button', { name: '새 대화 만들기', exact: true })).toBeEnabled();
   await expect(reader.getByRole('button', { name: '다른 대화에 보내기', exact: true })).toBeEnabled();
   await expect(reader.getByRole('textbox')).toHaveCount(0);
   await expect(reader.getByText('출처 정보', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: 'artifacts/b5-conclusion-desktop.png', fullPage: true });
   const readerElement = await reader.elementHandle();
+  await reader.getByRole('button', { name: '새 대화 만들기', exact: true }).click();
+  await expect(reader.getByLabel('프로젝트 검색', { exact: true })).toBeVisible();
+  await reader.getByRole('button', { name: '결론 보기로 돌아가기', exact: true }).click();
+  await expect(reader.getByRole('button', { name: '새 대화 만들기', exact: true })).toBeFocused();
   await reader.getByRole('button', { name: '다른 대화에 보내기', exact: true }).click();
   await expect(reader.getByLabel('대화 검색', { exact: true })).toBeVisible();
   await expect(page.locator('dialog[open]')).toHaveCount(1);

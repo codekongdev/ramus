@@ -11,15 +11,16 @@ export type ConclusionActions = {
 };
 
 /** WF-08/16: only the conclusion is content; opening this view has no effects. */
-export function ConclusionView({ revision, onCreateConversation, onSendToConversation, sendButtonRef }: ConclusionActions & {
+export function ConclusionView({ revision, onCreateConversation, onSendToConversation, sendButtonRef, createButtonRef }: ConclusionActions & {
   readonly revision: ConclusionRevision;
   readonly sendButtonRef?: Ref<HTMLButtonElement>;
+  readonly createButtonRef?: Ref<HTMLButtonElement>;
 }) {
   return <section className="conclusion-view" aria-label={messages.conclusionBody}>
     <h3>{messages.conclusion}</h3>
     <p className="conclusion-view__body">{revision.conclusion}</p>
     <div className="conclusion-view__actions">
-      <Button variant="outline" disabled={!onCreateConversation}
+      <Button variant="outline" disabled={!onCreateConversation} ref={createButtonRef}
         title={!onCreateConversation ? messages.actionUnavailable : undefined}
         onClick={() => onCreateConversation?.(revision)}>{messages.createConversation}</Button>
       <Button variant="outline" disabled={!onSendToConversation} ref={sendButtonRef}

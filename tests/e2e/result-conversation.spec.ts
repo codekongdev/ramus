@@ -87,6 +87,7 @@ async function openCreation(page: Page) {
 }
 
 test('chooses a project, preserves an old conclusion in the same dialog, and navigates only after creation', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   const fixture = await mockFollowup(page);
   const dialog = await openCreation(page);
   const create = dialog.getByRole('button', { name: '만들기', exact: true });
@@ -239,4 +240,19 @@ test('real server creates a root conversation with exactly the viewed conclusion
   await page.getByRole('dialog').getByRole('button', { name: '닫기', exact: true }).click();
   expect((await (await page.request.get(`/api/conversations/${id}/messages`)).json()).items).toEqual([]);
   expect((await (await page.request.get(`/api/conversations/${id}/resources`)).json()).items).toEqual([]);
+
+  // The pinned cross-project conclusion keeps its normal send action in the receiving project.
+  const destination = await post(`/api/projects/${project.id}/conversations`, { title: 'B7 후속 수신 대화' });
+  await page.getByRole('button', { name: `${old.title} v1 결론 보기`, exact: true }).click();
+  const received = page.getByRole('dialog');
+  await received.getByRole('button', { name: '다른 대화에 보내기', exact: true }).click();
+  await received.getByLabel('대화 검색', { exact: true }).fill('B7 후속 수신');
+  await received.getByRole('checkbox', { name: 'B7 후속 수신 대화', exact: false }).check();
+  await received.getByRole('button', { name: '보내기', exact: true }).click();
+  await expect(received.getByRole('button', { name: '다른 대화에 보내기', exact: true })).toBeFocused();
+  const forwarded = await (await page.request.get(`/api/conversations/${destination.id}/inputs`)).json();
+  expect(forwarded.items).toHaveLength(1);
+  expect(forwarded.items[0]).toMatchObject({ result_revision_id: old.id, version: 1, origin: 'share' });
+  const destinationDetail = await (await page.request.get(`/api/conversations/${destination.id}`)).json();
+  expect(destinationDetail.active_run).toBeNull();
 });

@@ -1,5 +1,5 @@
 import { useWorkspaceHeader } from '../../features/auth/WorkspaceHeader';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { TaskConversationTree } from '../../features/task-navigation';
 import { TaskQueue } from '../../features/task-queue';
 import { TaskModal } from '../../features/task-modal';
@@ -18,14 +18,21 @@ import type { ConclusionRevision } from '../../lib/api/result-contract';
 import type { Conversation as CreatedConversation } from '../../features/sharing/model';
 
 /** Compose result reading and sending without feature-to-feature imports. */
-function WorkspaceConclusion({ revision, projectId, conversationId, actions }: {
+function WorkspaceConclusion({ revision, projectId, conversationId, actions, sendButtonRef }: {
   readonly revision: ConclusionRevision;
   readonly projectId: string;
   readonly conversationId: string;
   readonly actions?: ConclusionActions;
+  readonly sendButtonRef?: Ref<HTMLButtonElement>;
 }) {
   const send = useSendConclusion();
   const [source, setSource] = useState<ConclusionRevision | null>(null);
+  const createButtonRef = useRef<HTMLButtonElement>(null);
+  const wasCreating = useRef(false);
+  useEffect(() => {
+    if (wasCreating.current && !source) createButtonRef.current?.focus({ preventScroll: true });
+    wasCreating.current = source !== null;
+  }, [source]);
   const { closeModal } = useModalHost();
   const created = useCallback((conversation: CreatedConversation) => {
     closeModal();
@@ -35,7 +42,7 @@ function WorkspaceConclusion({ revision, projectId, conversationId, actions }: {
   if (send.state.target) return <SendConclusion controller={send} />;
   return <>
     {send.state.notice && <p role="status">{send.state.notice}</p>}
-    <ConclusionView revision={revision} {...actions} onCreateConversation={actions?.onCreateConversation ?? setSource} sendButtonRef={send.returnFocusRef}
+    <ConclusionView revision={revision} {...actions} onCreateConversation={actions?.onCreateConversation ?? setSource} createButtonRef={createButtonRef} sendButtonRef={sendButtonRef ?? send.returnFocusRef}
       onSendToConversation={actions?.onSendToConversation ?? (value => send.dispatch({ type: 'open', target: { projectId, currentConversationId: conversationId, revision: value } }))} />
   </>;
 }
@@ -63,6 +70,12 @@ function WorkspaceTaskModal({ taskId, close, ensureAiConnection, renderTaskHeade
 }) {
   const controller = useTaskResult(taskId, ensureAiConnection);
   const [source, setSource] = useState<ConclusionRevision | null>(null);
+  const createButtonRef = useRef<HTMLButtonElement>(null);
+  const wasCreating = useRef(false);
+  useEffect(() => {
+    if (wasCreating.current && !source) createButtonRef.current?.focus({ preventScroll: true });
+    wasCreating.current = source !== null;
+  }, [source]);
   const created = useCallback((conversation: CreatedConversation) => {
     close();
     navigate({ name: 'workspace', projectId: conversation.project_id, conversationId: conversation.id });
@@ -75,7 +88,7 @@ function WorkspaceTaskModal({ taskId, close, ensureAiConnection, renderTaskHeade
     renderResultTab={(task, nav) => renderTaskResultTab ? renderTaskResultTab(task, nav)
       : send.state.target ? <SendConclusion controller={send} /> : <>
         {send.state.notice && <p role="status">{send.state.notice}</p>}
-        <TaskResultTab controller={controller} onOpenConclusion={onOpenConclusion} {...conclusionActions} onCreateConversation={conclusionActions?.onCreateConversation ?? setSource} sendButtonRef={send.returnFocusRef}
+        <TaskResultTab controller={controller} onOpenConclusion={onOpenConclusion} {...conclusionActions} onCreateConversation={conclusionActions?.onCreateConversation ?? setSource} createButtonRef={createButtonRef} sendButtonRef={send.returnFocusRef}
           onSendToConversation={conclusionActions?.onSendToConversation ?? (revision => {
             const result = controller.state.result;
             if (result) send.dispatch({ type: 'open', target: { projectId: result.project_id, currentConversationId: result.source_conversation_id, revision } });
@@ -111,7 +124,7 @@ export function WorkspacePage({
   const openReceivedResult = useCallback((input: ConversationInput) => openModal({
     id: `result:${input.result_revision_id}`,
     render: close => <ReceivedResultDialog key={input.result_revision_id} projectId={projectId} input={input} onClose={close}
-      renderConclusion={(revision, controls) => <WorkspaceConclusion revision={revision} projectId={projectId} conversationId={input.conversation_id}
+      renderConclusion={(revision, controls) => <WorkspaceConclusion revision={revision} projectId={projectId} conversationId={input.conversation_id} sendButtonRef={controls.sendButtonRef}
         actions={{ ...conclusionActions, onSendToConversation: conclusionActions?.onSendToConversation ?? controls.onSendToConversation }} />} />,
   }), [openModal, projectId, conclusionActions]);
   return <AppShell project={header.project} participants={header.participants} {...slots}

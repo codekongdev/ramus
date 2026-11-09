@@ -18,8 +18,5 @@ export const sharingMessages = {
   creating: '만드는 중',
   permission: '이 프로젝트에 대화를 만들 권한이 변경되었습니다. 다른 프로젝트를 선택해 주세요.',
   linked: '연결된 결론',
-  received: '받은 결론 보기',
   openInput: (title: string, version: number) => `${title} v${version} 결론 보기`,
-  inputsLoading: '연결된 결론을 불러오고 있습니다.',
-  inputsRetry: '다시 불러오기',
 } as const;

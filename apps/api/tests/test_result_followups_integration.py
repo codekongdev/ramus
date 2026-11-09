@@ -337,3 +337,149 @@ def test_input_detail_checks_conversation_binding_current_membership_and_login(f
         session.execute(delete(membership).where(membership.c.project_id == fixture.target_project,
                                                 membership.c.account_id == fixture.recipient_id))
     assert fixture.recipient.get(path).status_code == 404
+
+
+def forward_snapshot(fixture, targets, *, client=None, revision=None, key=None):
+    return (client or fixture.recipient).post(
+        f"/api/result-revisions/{revision or fixture.old_revision}/shares",
+        json={"conversation_ids": [str(target) for target in targets]}, headers=key or new_key(),
+    )
+
+
+def root_conversation(fixture, *, project=None, client=None):
+    response = (client or fixture.owner).post(
+        f"/api/projects/{project or fixture.target_project}/conversations",
+        json={"title": "받은 결론을 전달할 대화"}, headers=new_key(),
+    )
+    assert response.status_code == 200, response.text
+    return UUID(response.json()["id"])
+
+
+def test_received_conclusion_forwards_only_stored_snapshot_with_target_project_event_and_no_ai(followups, database, monkeypatch):
+    from dataclasses import replace
+
+    from ramus_api.modules.results.public import ResultReader
+
+    fixture = followups
+    received = fixture.create().json()
+    [original] = rows(database, "conversation_input", conversation_id=UUID(received["id"]))
+    target = root_conversation(fixture)
+    assert fixture.recipient.get(f"/api/result-revisions/{fixture.old_revision}").status_code == 404
+    before_runs = len(rows(database, "run"))
+    container = fixture.app.state.container
+    fixture.owner.portal.call(container.event_relay.flush)
+    source_events = fixture.owner.portal.call(container.events.subscribe, fixture.source_project)
+    target_events = fixture.owner.portal.call(container.events.subscribe, fixture.target_project)
+    original_reader = ResultReader.revision
+
+    def changed_original(self, session, revision_id):
+        revision = original_reader(self, session, revision_id)
+        return replace(revision, title="원본에서 조회한 다른 제목", conclusion="복사하면 안 되는 원본 본문",
+                       source=replace(revision.source, message_to_seq=99, resource_revision_ids=())) if revision else None
+
+    monkeypatch.setattr(ResultReader, "revision", changed_original)
+    key = new_key()
+    try:
+        sent = forward_snapshot(fixture, [target], key=key)
+        assert sent.status_code == 200, sent.text
+        assert sent.json()["items"] == [{"conversation_id": str(target), "outcome": "linked"}]
+        assert forward_snapshot(fixture, [target], key=key).json() == sent.json()
+        assert forward_snapshot(fixture, [target]).json()["items"][0]["outcome"] == "unchanged"
+        [stored] = rows(database, "conversation_input", conversation_id=target)
+        assert stored["result_revision_id"] == fixture.old_revision and stored["version"] == 1
+        assert stored["title_snapshot"] == original["title_snapshot"]
+        assert stored["conclusion_snapshot"] == original["conclusion_snapshot"]
+        assert stored["source_snapshot"] == original["source_snapshot"]
+        assert stored["origin"] == "share" and stored["created_by"] == fixture.recipient_id
+        assert len(rows(database, "share", target_conversation_id=target)) == 1
+        assert len(rows(database, "run")) == before_runs
+        assert not rows(database, "message", conversation_id=target)
+        assert not rows(database, "conversation_resource", conversation_id=target)
+        with database.transaction() as session:
+            context = build_context_provider().snapshot(session, target)
+            assert context.resources == ()
+            assert [item.result_revision_id for item in context.results] == [fixture.old_revision]
+            assert context.results[0].conclusion == original["conclusion_snapshot"]
+        fixture.owner.portal.call(container.event_relay.flush)
+        event = fixture.owner.portal.call(target_events.next, 0.2)
+        assert event.name == "conversation_inputs.updated"
+        assert event.project_id == fixture.target_project and event.data["conversation_id"] == target
+        assert fixture.owner.portal.call(target_events.next, 0.01) is None
+        assert fixture.owner.portal.call(source_events.next, 0.01) is None
+    finally:
+        fixture.owner.portal.call(target_events.close)
+        fixture.owner.portal.call(source_events.close)
+
+
+def test_forwarding_is_limited_to_exact_revision_already_received_in_each_destination_project(followups, database):
+    fixture = followups
+    fixture.create()
+    target = root_conversation(fixture)
+    third = fixture.owner.post("/api/projects", json={"name": "별도 프로젝트"}, headers=new_key()).json()
+    third_project = UUID(third["id"])
+    with database.transaction() as session:
+        session.execute(insert(metadata.tables["membership"]).values(
+            project_id=third_project, account_id=fixture.recipient_id, role="editor",
+        ))
+    third_target = root_conversation(fixture, project=third_project)
+    assert forward_snapshot(fixture, [target], revision=fixture.latest_revision).status_code == 404
+    assert forward_snapshot(fixture, [target], client=fixture.outsider).status_code == 404
+    assert forward_snapshot(fixture, [third_target]).status_code == 404
+    assert forward_snapshot(fixture, [third_target], client=fixture.owner).status_code == 422
+    assert forward_snapshot(fixture, [target, third_target]).status_code == 422
+    assert forward_snapshot(fixture, [fixture.source_conversation], client=fixture.owner).status_code == 422
+    assert not rows(database, "conversation_input", conversation_id=target)
+    assert not rows(database, "conversation_input", conversation_id=third_target)
+    # A separate explicit B7 creation can deliver that version to the third project.
+    assert fixture.create(project=third_project).status_code == 200
+    accepted = forward_snapshot(fixture, [third_target])
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["items"][0]["outcome"] == "linked"
+
+
+def test_forwarding_replay_and_mutation_recheck_receiving_project_membership(followups, database, monkeypatch):
+    from ramus_api.shared.infrastructure.receipts import SqlIdempotentExecutor
+
+    fixture = followups
+    fixture.create()
+    target = root_conversation(fixture)
+    key = new_key()
+    sent = forward_snapshot(fixture, [target], key=key)
+    assert sent.status_code == 200, sent.text
+    membership = metadata.tables["membership"]
+    with database.transaction() as session:
+        session.execute(delete(membership).where(membership.c.project_id == fixture.target_project,
+                                                membership.c.account_id == fixture.recipient_id))
+    assert forward_snapshot(fixture, [target], key=key).status_code == 404
+    with database.transaction() as session:
+        session.execute(insert(membership).values(project_id=fixture.target_project,
+                                                 account_id=fixture.recipient_id, role="editor"))
+    second_target = root_conversation(fixture)
+    execute_once = SqlIdempotentExecutor.execute_once
+
+    def revoke_before_mutation(self, actor_id, scope, request_key, payload, operation):
+        if scope.startswith("sharing.send:"):
+            with database.transaction() as session:
+                session.execute(delete(membership).where(membership.c.project_id == fixture.target_project,
+                                                        membership.c.account_id == fixture.recipient_id))
+        return execute_once(self, actor_id, scope, request_key, payload, operation)
+
+    monkeypatch.setattr(SqlIdempotentExecutor, "execute_once", revoke_before_mutation)
+    failed_key = new_key()
+    denied = forward_snapshot(fixture, [second_target], key=failed_key)
+    assert denied.status_code == 404, denied.text
+    assert not rows(database, "conversation_input", conversation_id=second_target)
+    assert not rows(database, "share", target_conversation_id=second_target)
+    assert not rows(database, "request_receipt", idempotency_key=failed_key["Idempotency-Key"])
+
+
+def test_unreceived_inaccessible_revision_is_hidden_even_for_owner_of_mixed_target_projects(followups, database):
+    fixture = followups
+    projects = [fixture.outsider.post("/api/projects", json={"name": f"개인 프로젝트 {index}"}, headers=new_key()).json()
+                for index in range(2)]
+    targets = [root_conversation(fixture, project=UUID(project["id"]), client=fixture.outsider) for project in projects]
+    existing = forward_snapshot(fixture, targets, client=fixture.outsider)
+    missing = forward_snapshot(fixture, targets, client=fixture.outsider, revision=uuid4())
+    assert existing.status_code == missing.status_code == 404
+    assert existing.json() == missing.json()
+    assert all(not rows(database, "conversation_input", conversation_id=target) for target in targets)
