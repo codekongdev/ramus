@@ -27,6 +27,7 @@ IMPLEMENTED = frozenset({
     "getResource", "createResourceRevision",
     "listConversationTasks", "getTask",
     "createTaskSummary", "getResult", "getResultRevision", "saveResultRevision",
+    "shareResultRevision", "listConversationInputs",
 })
 STUBS = tuple(e for e in CONTRACT_ENDPOINTS if e.operation_id not in IMPLEMENTED)
 
@@ -143,13 +144,17 @@ def test_message_pagination_requires_login(client: TestClient) -> None:
     assert client.get(f"/api/conversations/{ID}/messages", params={"limit": 200}).status_code == 401
 
 
-def test_share_with_no_targets_reaches_the_handler(client: TestClient) -> None:
-    # Contract 1.2: an empty target list is SHARE_TARGET_INVALID (business rule), not INVALID_INPUT.
+def test_sharing_requires_login_before_validating_targets(client: TestClient) -> None:
+    # Authenticated empty-target behavior is covered by sharing integration tests.
     response = client.post(f"/api/result-revisions/{ID}/shares", json={"conversation_ids": []}, headers=KEY)
-    assert response.status_code == 501
+    assert response.status_code == 401
 
 
 def test_share_to_more_than_20_targets_is_rejected(client: TestClient) -> None:
     ids = [str(uuid4()) for _ in range(21)]
-    response = client.post(f"/api/result-revisions/{ID}/shares", json={"conversation_ids": ids}, headers=KEY)
-    assert response.status_code == 422
+    from pydantic import ValidationError
+
+    from ramus_api.modules.sharing.presentation.dto import ShareResultRevisionRequest
+
+    with pytest.raises(ValidationError):
+        ShareResultRevisionRequest(conversation_ids=ids)
