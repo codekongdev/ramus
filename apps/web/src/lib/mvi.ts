@@ -39,9 +39,19 @@ export interface Store<S, I> {
   getState(): S;
   dispatch: Dispatch<I>;
   subscribe(listener: () => void): () => void;
-  /** Starts accepting intents and running effects. Idempotent. */
+  /**
+   * Starts running intents and effects, first replaying any intents dispatched while
+   * inactive (in order). Cancels a teardown requested by `deactivate()` in the same tick.
+   * Idempotent.
+   */
   activate(): void;
-  /** Aborts running effects and drops further intents until activated again. Idempotent. */
+  /**
+   * Requests teardown: on the next microtask, running effects are aborted (their late
+   * results are dropped) and the store goes inactive. Calling `activate()` before then keeps
+   * everything running — this is what StrictMode's unmount/remount check does, so a
+   * request started on the first setup is not lost while the state already says "loading".
+   * Idempotent.
+   */
   deactivate(): void;
 }
 
@@ -56,7 +66,11 @@ const rethrowAsync = (error: unknown) => {
   });
 };
 
-/** Framework-free store. Starts inactive; call `activate()` before dispatching. */
+/**
+ * Framework-free store. Starts inactive; intents dispatched before `activate()` are queued,
+ * so a child view may dispatch from its own effect before the parent's effect activates the
+ * store (React runs child effects first).
+ */
 export function createStore<S, I, E>(
   reducer: Reducer<S, I, E>,
   initialState: S,
@@ -67,6 +81,8 @@ export function createStore<S, I, E>(
   const listeners = new Set<() => void>();
   let state = initialState;
   let controller: AbortController | null = null;
+  let teardownRequested = false;
+  const queued: I[] = [];
 
   const runEffect = (effect: E, signal: AbortSignal) => {
     const guardedDispatch: Dispatch<I> = (intent) => {
@@ -81,7 +97,10 @@ export function createStore<S, I, E>(
   };
 
   const dispatch: Dispatch<I> = (intent) => {
-    if (!controller) return;
+    if (!controller) {
+      queued.push(intent);
+      return;
+    }
     const result = reducer(state, intent);
     if (result.state !== state) {
       state = result.state;
@@ -99,11 +118,20 @@ export function createStore<S, I, E>(
       return () => listeners.delete(listener);
     },
     activate() {
-      controller ??= new AbortController();
+      teardownRequested = false;
+      if (controller) return;
+      controller = new AbortController();
+      for (const intent of queued.splice(0)) dispatch(intent);
     },
     deactivate() {
-      controller?.abort();
-      controller = null;
+      if (!controller || teardownRequested) return;
+      teardownRequested = true;
+      queueMicrotask(() => {
+        if (!teardownRequested) return;
+        teardownRequested = false;
+        controller?.abort();
+        controller = null;
+      });
     },
   };
 }

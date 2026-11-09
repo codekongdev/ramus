@@ -10,13 +10,17 @@ import {
 const iso = '2026-11-09T04:17:23Z'; // 13:17 in Asia/Seoul
 const seoul = { timeZone: 'Asia/Seoul' };
 
+// The day-period label differs across ICU versions (e.g. "오후 1:17" vs "PM 1:17" in
+// Node 24.13 / ICU 78.2), so only the label is matched loosely; digits stay exact.
+const koAfternoon = String.raw`(?:오후|PM)\s1:17`;
+
 describe('date formatting', () => {
   it('formats in the given locale and zone', () => {
     expect(formatDate(iso, 'ko', seoul)).toBe('2026. 11. 9.');
     expect(formatDate(iso, 'en', seoul)).toBe('Nov 9, 2026');
-    expect(formatTime(iso, 'ko', seoul)).toBe('오후 1:17');
+    expect(formatTime(iso, 'ko', seoul)).toMatch(new RegExp(`^${koAfternoon}$`));
     expect(formatTime(iso, 'en', seoul)).toMatch(/^1:17\sPM$/);
-    expect(formatDateTime(iso, 'ko', seoul)).toBe('2026. 11. 9. 오후 1:17');
+    expect(formatDateTime(iso, 'ko', seoul)).toMatch(new RegExp(`^2026\\. 11\\. 9\\.,?\\s${koAfternoon}$`));
   });
 
   it('uses the zone to pick the calendar day', () => {
