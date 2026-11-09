@@ -5,6 +5,7 @@ Development conventions and environment setup.
 - [CONVENTIONS.md](CONVENTIONS.md): Architecture and shared implementation rules
 - [AGENTS.md](AGENTS.md): Agent workflow rules
 - [A5 automatic branching integration](docs/a5-auto-branch.md): Work executor assembly, input scope and version inheritance, and local verification
+- [B1 shared skills and resources](docs/b1-resources-ui.md): Register, import, search, and apply pinned resource versions
 - `apps/web/`: React · TypeScript · Vite · Vitest setup
 - `apps/api/`: Python · FastAPI · Ruff · pytest setup
 - `compose.yaml`: Local PostgreSQL configuration
