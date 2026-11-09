@@ -28,6 +28,14 @@ class CredentialProvider(Protocol):
     def get_api_key(self, account_id: UUID) -> str: ...
 
 
+class ProjectAccess(Protocol[TransactionT]):
+    """Public project authorization and safe author labels; no account credentials are exposed."""
+
+    def require_member(self, transaction: TransactionT, project_id: UUID, account_id: UUID) -> None: ...
+
+    def display_names(self, transaction: TransactionT, account_ids: set[UUID]) -> dict[UUID, str]: ...
+
+
 class Clock(Protocol):
     def now(self) -> datetime: ...
 

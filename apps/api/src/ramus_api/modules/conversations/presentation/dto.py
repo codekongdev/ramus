@@ -4,8 +4,9 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
+from ramus_api.modules.conversations.domain.views import validate_text
 from ramus_api.modules.execution.presentation.dto import Run
 from ramus_api.shared.presentation.schemas import ApiRequest, ApiResponse
 
@@ -39,6 +40,11 @@ class ConversationList(ApiResponse):
 class CreateConversationRequest(ApiRequest):
     title: str = Field(min_length=1, max_length=MAX_CONVERSATION_TITLE_LENGTH)
 
+    @field_validator("title")
+    @classmethod
+    def meaningful_title(cls, value: str) -> str:
+        return validate_text(value, MAX_CONVERSATION_TITLE_LENGTH)
+
 
 class MessageAuthor(ApiResponse):
     kind: AuthorKind
@@ -65,6 +71,11 @@ class MessageList(ApiResponse):
 
 class PostMessageRequest(ApiRequest):
     body: str = Field(min_length=1, max_length=MAX_MESSAGE_BODY_LENGTH)
+
+    @field_validator("body")
+    @classmethod
+    def meaningful_body(cls, value: str) -> str:
+        return validate_text(value, MAX_MESSAGE_BODY_LENGTH)
 
 
 class PostMessageResponse(ApiResponse):
