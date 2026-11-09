@@ -1,4 +1,4 @@
-# ramus 계약 v1.1
+# ramus 계약 v1.2
 
 확정일: 2026-11-09 · 작업자: 메이슨, 헤이든 · 상태: 확정
 
@@ -23,13 +23,14 @@
 | 항목 | 규칙 |
 |---|---|
 | 경로 | 모든 API는 `/api`로 시작한다. 웹과 같은 출처에서만 호출하며 CORS는 열지 않는다 |
+| 이름 기준 | 필드·타입(컴포넌트)·경로 매개변수·`operation_id`의 실제 이름은 `contracts/openapi.json`을 따른다. 이 문서의 `{id}`는 설명용이며 실제 경로는 `{conversation_id}`처럼 대상 이름을 쓴다. 이 문서에서 이름 없이 적은 작은 객체(`{status}` 등)도 OpenAPI에서는 이름 있는 타입이다. 생성 파일은 `pnpm gen:api`로 만들고 손으로 고치지 않는다 |
 | 필드 이름 | JSON 필드는 `snake_case`를 쓴다. 프론트는 생성된 타입의 이름을 그대로 쓴다 |
 | 식별자 | UUID 문자열. 시드 데이터는 고정 시드 키로 만든 UUIDv5를 써서 다시 실행해도 같은 ID가 나온다 |
 | 시각 | ISO 8601 UTC(`2026-11-09T04:17:23Z`) |
 | 성공 응답 | 감싸지 않고 리소스를 그대로 돌려준다. 성공 여부는 HTTP 상태로 판단한다 |
 | 목록 응답 | `{"items": [...]}` 객체. 페이지가 필요한 목록(메시지)만 커서 필드를 더한다 |
 | 변경 응답 | 모든 변경 요청은 JSON 객체를 돌려준다. 돌려줄 리소스가 없으면 `{}`를 돌려준다(멱등 receipt 저장 조건) |
-| 변경 요청 | `POST`·`PUT`·`DELETE`는 `Content-Type: application/json`과 `Idempotency-Key`가 필수다. 로그인 전 요청(인증 코드 요청·확인)도 같다 |
+| 변경 요청 | `POST`·`PUT`·`DELETE`는 `Content-Type: application/json`과 `Idempotency-Key`가 필수다. 로그인 전 요청(인증 코드 요청·확인)도 같다. 요청이 `{}`인 엔드포인트(로그아웃, 작업 중단·재시도, 결과 정리)도 빈 JSON 객체 본문을 보낸다 |
 | 멱등 범위 | receipt는 (행위자, 범위, 키)로 구분한다. 로그인 전 요청의 행위자는 `anonymous`다. 프론트는 사용자 행동 하나마다 키를 하나 만들고, 그 행동을 재시도할 때 같은 키를 다시 쓴다 |
 | 낙관적 잠금 | 버전이 있는 대상(결과, 공통 자료)은 기준 버전을 함께 보내고, 최신 버전과 다르면 409 `VERSION_CONFLICT`를 돌려준다. `details`에 최신 버전 정보를 담는다 |
 | 권한 | 프로젝트 하위 리소스는 그 프로젝트의 참여자만 조회·변경한다. 참여자가 아니면 존재를 알리지 않도록 404 `NOT_FOUND`를 돌려준다. 로그인하지 않았으면 401 `UNAUTHORIZED` |
@@ -53,6 +54,7 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 | 코드 | 상태 | 상황 |
 |---|---|---|
 | `INVALID_INPUT` | 422 | 요청 본문 검증 실패 |
+| `NOT_IMPLEMENTED` | 501 | 아직 구현하지 않은 엔드포인트(P0-A3 스텁) |
 | `IDEMPOTENCY_KEY_INVALID` | 400 | 멱등 키 없음·형식 오류 |
 | `IDEMPOTENCY_CONFLICT` | 409 | 같은 키로 다른 본문 |
 | `AUTH_CODE_INVALID` | 422 | 인증 코드 불일치 |
@@ -66,7 +68,7 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 | `TASK_NOT_READY` | 409 | 실행이 끝나지 않은 작업의 결과 정리 요청 |
 | `VERSION_CONFLICT` | 409 | 기준 버전이 최신 버전과 다름 |
 | `FILE_TYPE_UNSUPPORTED` | 422 | `.md`·`.txt`가 아니거나 UTF-8 텍스트가 아님(D9) |
-| `SHARE_TARGET_INVALID` | 422 | 보낼 대상이 없음, 다른 프로젝트, 결과의 출처 대화 |
+| `SHARE_TARGET_INVALID` | 422 | 보낼 대상이 없음(`conversation_ids`가 빈 목록이어도 `INVALID_INPUT`이 아니라 이 코드), 다른 프로젝트, 결과의 출처 대화 |
 | `PROJECT_CREATE_FORBIDDEN` | 403 | 대상 프로젝트에 대화를 만들 권한이 없음 |
 
 ## 2. 공통 데이터 형태
@@ -329,4 +331,5 @@ export type TaskModalProps = {
 | 날짜 | 버전 | 내용 |
 |---|---|---|
 | 2026-11-09 | v1 | 최초 확정. P0-A1·P0-B1에서 정해진 항목을 반영 |
+| 2026-11-09 | v1.2 | P0-A3 구현에 맞춰 보완: 실제 이름은 `contracts/openapi.json` 기준, 빈 본문 변경 요청, `NOT_IMPLEMENTED`, 빈 보낼 대상 목록의 오류 코드 |
 | 2026-11-09 | v1.1 | `task`·`run`의 `error_message`를 `error_params`(JSONB)로 바꾸고 `result_draft`에도 추가. 사용자에게 보여 줄 문장을 DB에 저장하지 않는 규칙 추가(로드맵 9.3-1) |
