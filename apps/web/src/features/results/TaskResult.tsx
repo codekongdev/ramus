@@ -4,6 +4,8 @@ import { Badge, Button, Label, Spinner, Textarea } from '../../ui';
 import { resultMessages as messages } from './messages';
 import { generating, latestSourceRunId } from './model';
 import type { TaskResultController } from './useTaskResult';
+import { SendConclusion, useSendConclusion } from '../sharing';
+import { sharingMessages } from '../sharing/messages';
 import './results.css';
 
 export function SummaryAction({ controller, onShowResult }: { readonly controller: TaskResultController; readonly onShowResult: () => void }) {
@@ -18,10 +20,14 @@ export function SummaryAction({ controller, onShowResult }: { readonly controlle
 
 export function TaskResultTab({ controller }: { readonly controller: TaskResultController }) {
   const { state, dispatch, save } = controller;
+  const send = useSendConclusion();
   const busy = state.mutation !== null;
   const active = generating(state);
   const viewed = state.viewed;
+  const result = state.result;
+  if (send.state.target) return <SendConclusion controller={send} />;
   return <div className="task-result">
+    {send.state.notice && <p role="status">{send.state.notice}</p>}
     {state.loading && !state.result && <p role="status"><Spinner label={messages.loading} /> {messages.loading}</p>}
     {active && <p className="task-result__status" role="status"><Spinner label={messages.generatingAction} /> {messages.generating}</p>}
     {state.notice && <p className="task-result__status" role="status">{state.notice}</p>}
@@ -54,6 +60,7 @@ export function TaskResultTab({ controller }: { readonly controller: TaskResultC
         {!state.editor && viewed.id === state.approved?.id && <Button variant="outline" disabled={busy || active} onClick={() => dispatch({ type: 'editApproved' })}>{messages.edit}</Button>}
       </div>
       <p className="task-result__body">{viewed.conclusion}</p>
+      {result && <div className="task-result__actions"><Button variant="outline" disabled={busy} ref={send.returnFocusRef} onClick={() => send.dispatch({ type: 'open', target: { projectId: result.project_id, currentConversationId: result.source_conversation_id, revision: viewed } })}>{sharingMessages.action}</Button></div>}
       <p className="task-result__hint"><time dateTime={viewed.created_at}>{formatDateTime(viewed.created_at, DEFAULT_LOCALE)}</time></p>
       <details className="task-result__source"><summary>{messages.source}</summary><p>{messages.sourceRange(viewed.source.message_from_seq, viewed.source.message_to_seq)}</p><p>{messages.sourceResources(viewed.source.resource_revision_ids.length)}</p></details>
     </section>}

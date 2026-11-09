@@ -8,6 +8,7 @@ Development conventions and environment setup.
 - [A8 project switching and creation](docs/a8-projects.md): Project access, idempotent creation, navigation, and local verification
 - [B1 shared skills and resources](docs/b1-resources-ui.md): Register, import, search, and apply pinned resource versions
 - [B2 resource revision management](docs/b2-resource-revisions.md): Resource history, editing, conflicts, and explicit version application
+- [B6 conclusion sharing](docs/b6-sharing.md): Send pinned conclusions to multiple conversations, receive and forward them, and explicitly replace input versions
 - `apps/web/`: React · TypeScript · Vite · Vitest setup
 - `apps/api/`: Python · FastAPI · Ruff · pytest setup
 - `compose.yaml`: Local PostgreSQL configuration
@@ -75,8 +76,8 @@ Reset removes user-created content in both fixed sample projects and restores th
 sessions, AI connections, memberships, project names, and unrelated projects. Active runs, conflicting database use,
 or another project's references to the sample conclusions prevent reset and roll back changes.
 There is no HTTP endpoint or product button for reset. See [B9 sample preparation](docs/b9-seed-content.md) for scope
-and local verification. Conclusion sharing, follow-up conversation creation, and the results library remain
-dependent on B5–B8 integration for the full product E2E.
+and local verification. B6 conclusion sharing is connected to the product UI and pinned AI inputs.
+Follow-up conversation creation and the results library remain dependent on B7–B8 integration for the full product E2E.
 
 ## Conversation and message backend (A2)
 

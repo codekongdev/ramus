@@ -10,6 +10,7 @@ import { AppShell, type AppShellSlots } from '../layout/AppShell';
 import { useModalHost } from '../modal/ModalHost';
 import { navigate } from '../routing/useRoute';
 import { ResourcesMenuButton } from '../../features/resources';
+import { ReceivedResults, ReceivedResultDialog, type ConversationInput } from '../../features/sharing';
 
 export type WorkspacePageProps = {
   readonly projectId: string;
@@ -52,12 +53,17 @@ export function WorkspacePage({
         ensureAiConnection={ensureAiConnection} />,
     });
   }, [openModal, renderTaskHeaderActions, renderTaskResultTab, ensureAiConnection]);
+  const openReceivedResult = useCallback((input: ConversationInput) => openModal({
+    id: `received-result:${input.result_revision_id}`,
+    render: close => <ReceivedResultDialog key={input.result_revision_id} projectId={projectId} input={input} onClose={close} />,
+  }), [openModal, projectId]);
   return <AppShell project={header.project} participants={header.participants} {...slots}
     workspaceMenu={slots?.workspaceMenu ?? <ResourcesMenuButton projectId={projectId} conversationId={conversationId} />}
     conversation={slots?.conversation ?? <Conversation projectId={projectId} conversationId={conversationId} ensureAiConnection={ensureAiConnection} />}
     conversationTree={projectId && <TaskConversationTree projectId={projectId} conversationId={conversationId}
       onSelectConversation={selectConversation} onInitialConversation={selectInitialConversation}
       onOpenTask={openTask} />}
+    sharedResults={slots?.sharedResults ?? (conversationId && <ReceivedResults key={conversationId} conversationId={conversationId} onOpen={openReceivedResult} />)}
     taskQueue={projectId && conversationId && <TaskQueue conversationId={conversationId} onOpenTask={openTask} />}
   />;
 

@@ -1,0 +1,58 @@
+.sharing-step,
+.received-results {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing) * 3);
+  min-width: 0;
+}
+.sharing-step h3,
+.received-results h2 {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+}
+.sharing-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing) * 2);
+}
+.sharing-actions--end { justify-content: flex-end; }
+.sharing-chips,
+.sharing-targets,
+.received-results__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sharing-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing) * 2);
+}
+.sharing-chips button { max-width: 100%; height: auto; white-space: normal; }
+.sharing-targets { max-height: 45vh; overflow-y: auto; }
+.sharing-target {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing) * 3);
+  min-height: calc(var(--spacing) * 12);
+  padding: calc(var(--spacing) * 3) calc(var(--spacing) * 2);
+  border-bottom: var(--hairline) solid var(--border);
+  cursor: pointer;
+}
+.sharing-target:focus-within { outline: var(--hairline) solid var(--ring); outline-offset: calc(var(--spacing) * -1); }
+.sharing-target input { accent-color: var(--primary); flex: none; }
+.sharing-target__text { display: flex; flex-direction: column; gap: var(--spacing); min-width: 0; }
+.sharing-title { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.sharing-hint { display: block; margin: 0; color: var(--muted-foreground); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.sharing-conclusion { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.received-result-modal { width: min(680px, calc(100vw - 32px)); }
+.received-results__list > li + li { border-top: var(--hairline) solid var(--border); }
+.received-results .received-results__row {
+  width: 100%; height: auto; min-height: calc(var(--spacing) * 12);
+  text-align: left; justify-content: space-between;
+  padding: calc(var(--spacing) * 3) calc(var(--spacing) * 2);
+  gap: calc(var(--spacing) * 2);
+}
+.received-results__versions { display: flex; flex: none; flex-wrap: wrap; gap: var(--spacing); }
