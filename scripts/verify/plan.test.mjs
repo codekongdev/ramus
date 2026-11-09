@@ -16,12 +16,30 @@ describe('STEPS', () => {
   it('covers lint, typecheck, unit, integration and contract checks', () => {
     assert.deepEqual(
       STEPS.map((s) => s.id),
-      ['web:typecheck', 'web:test', 'api:lint', 'api:unit', 'api:integration', 'contract', 'scripts:test'],
+      [
+        'web:typecheck',
+        'web:test',
+        'api:lint',
+        'api:unit',
+        'api:integration',
+        'contract:openapi',
+        'contract:types',
+        'i18n:hangul',
+        'scripts:test',
+      ],
     );
   });
 
   it('has unique ids', () => {
     assert.equal(new Set(STEPS.map((s) => s.id)).size, STEPS.length);
+  });
+
+  it('runs both OpenAPI drift checks as the contract area', () => {
+    const contract = STEPS.filter((s) => s.area === 'contract');
+    assert.deepEqual(
+      contract.map((s) => s.run.args.at(-1)),
+      ['apps/api/tests/test_openapi_drift.py', 'tests/api/schema-drift.test.ts'],
+    );
   });
 
   it('separates unit and integration tests by the pytest marker', () => {
@@ -66,7 +84,7 @@ describe('selectSteps', () => {
   });
 
   it('knows every area', () => {
-    assert.deepEqual(AREAS, ['web', 'api', 'contract', 'scripts']);
+    assert.deepEqual(AREAS, ['web', 'api', 'contract', 'i18n', 'scripts']);
   });
 });
 

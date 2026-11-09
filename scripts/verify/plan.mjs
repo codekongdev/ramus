@@ -5,7 +5,6 @@
 export const REQUIREMENTS = {
   uv: 'uv가 PATH에 없습니다. README의 개발 환경을 따라 uv를 설치하세요.',
   postgres: 'PostgreSQL에 연결할 수 없습니다. `pnpm db:up`으로 DB를 실행하세요.',
-  'contract-script': '루트 package.json에 `contract:check` 스크립트가 없습니다(P0-A3에서 추가).',
 };
 
 const API = ['uv', 'run', '--project', 'apps/api'];
@@ -27,12 +26,20 @@ export const STEPS = [
     requires: ['uv', 'postgres'],
     run: { tool: 'exec', args: [...API, 'pytest', '-m', 'integration'] },
   },
+  // OpenAPI drift checks from P0-A3, also part of api:unit / web:test, run here under their own name.
   {
-    id: 'contract',
+    id: 'contract:openapi',
     area: 'contract',
-    requires: ['contract-script'],
-    run: { tool: 'pnpm', args: ['run', 'contract:check'] },
+    requires: ['uv'],
+    run: { tool: 'exec', args: [...API, 'pytest', 'apps/api/tests/test_openapi_drift.py'] },
   },
+  {
+    id: 'contract:types',
+    area: 'contract',
+    run: { tool: 'pnpm', args: ['--filter', '@ramus/web', 'exec', 'vitest', 'run', 'tests/api/schema-drift.test.ts'] },
+  },
+  // roadmap 9.3 rule 3: screen text lives in each feature's messages.ts, not in .tsx files.
+  { id: 'i18n:hangul', area: 'i18n', run: { tool: 'node', args: ['scripts/verify/hangul.mjs'] } },
   { id: 'scripts:test', area: 'scripts', run: { tool: 'node', args: ['--test', 'scripts/verify/*.test.mjs'] } },
 ];
 
