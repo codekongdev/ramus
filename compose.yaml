@@ -1,0 +1,19 @@
+name: ramus-local
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ramus
+      POSTGRES_USER: ramus
+      POSTGRES_PASSWORD: ramus-local
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - ramus-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ramus -d ramus"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+volumes:
+  ramus-db:

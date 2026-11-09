@@ -1,0 +1,12 @@
+{
+  "name": "ramus",
+  "private": true,
+  "scripts": {
+    "db:up": "docker compose up -d --wait db",
+    "db:stop": "docker compose stop db"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1"
+  },
+  "packageManager": "pnpm@11.3.0"
+}
