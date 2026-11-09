@@ -13,7 +13,8 @@ class IdempotentExecutor(Protocol[TransactionT]):
 
     ``operation`` receives the open transaction so its side effects commit or roll back together
     with the receipt. Raises ``BusinessError`` (409 ``IDEMPOTENCY_CONFLICT``) when the same key is
-    reused with a different payload.
+    reused with a different payload. ``operation`` must be a short DB-only step with no external calls
+    (no AI/HTTP); see ``SqlIdempotentExecutor.execute_once`` for why.
     """
 
     def execute_once(

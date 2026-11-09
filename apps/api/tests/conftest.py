@@ -26,15 +26,8 @@ API_ROOT = Path(__file__).resolve().parents[1]
 ALEMBIC_INI = API_ROOT / "alembic.ini"
 TEST_DATABASE_PREFIX = "ramus_test_"
 ADMIN_DATABASE = "postgres"
-INTEGRATION_MARKER = "integration: requires a running PostgreSQL server (start it with `pnpm db:up`)"
 
 AlembicRunner = Callable[..., subprocess.CompletedProcess[str]]
-
-
-def pytest_configure(config: pytest.Config) -> None:
-    # Also registered in pyproject.toml; repeated here because running pytest from the repository root
-    # does not read apps/api/pyproject.toml.
-    config.addinivalue_line("markers", INTEGRATION_MARKER)
 
 
 def _render(url: URL) -> str:

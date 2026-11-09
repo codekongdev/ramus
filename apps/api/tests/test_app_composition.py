@@ -40,5 +40,20 @@ def test_each_module_receives_the_shared_container(monkeypatch) -> None:
     assert container.idempotency is not None
 
 
-def test_module_level_app_exists() -> None:
-    assert isinstance(main.app, FastAPI)
+def test_importing_main_does_not_build_an_app() -> None:
+    assert not hasattr(main, "app")
+
+
+def test_module_entrypoint_uses_the_app_factory(monkeypatch) -> None:
+    import uvicorn
+
+    from ramus_api import __main__ as entrypoint
+
+    calls: list[tuple[tuple, dict]] = []
+    monkeypatch.setattr(uvicorn, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
+    monkeypatch.setenv("RAMUS_API_PORT", "8010")
+    entrypoint.main()
+    [(args, kwargs)] = calls
+    assert args == ("ramus_api.main:create_app",)
+    assert kwargs["factory"] is True
+    assert (kwargs["host"], kwargs["port"]) == ("127.0.0.1", 8010)

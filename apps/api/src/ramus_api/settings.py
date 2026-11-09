@@ -1,6 +1,7 @@
 """Runtime configuration read from the environment and the repository-root ``.env`` file.
 
 Environment variables take priority over ``.env``; a missing ``.env`` file is allowed.
+Empty values are treated as unset.
 """
 
 from pathlib import Path
@@ -21,6 +22,7 @@ class Settings(BaseSettings):
         env_file=REPO_ROOT / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        env_ignore_empty=True,  # `RAMUS_API_PORT=` means "unset", matching vite.config.ts.
         frozen=True,
     )
 

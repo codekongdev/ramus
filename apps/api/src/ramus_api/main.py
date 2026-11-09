@@ -1,6 +1,7 @@
 """Composition root: builds the container and registers every module.
 
 Add a module by appending its ``register`` function to ``MODULES``.
+There is no module-level app; servers use the factory (``uvicorn --factory ramus_api.main:create_app``).
 """
 
 from collections.abc import AsyncIterator
@@ -45,5 +46,3 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         register(app, container)
     return app
 
-
-app = create_app()

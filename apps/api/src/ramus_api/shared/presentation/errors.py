@@ -1,4 +1,7 @@
-"""Error envelope: every error response is ``{"error": {"code", "message", "details"}}``."""
+"""Error envelope: every error response is ``{"error": {"code", "message", "details"}}``.
+
+Modules raise ``BusinessError`` instead of ``HTTPException``; ``HTTPException.detail`` is not exposed.
+"""
 
 import logging
 from typing import Any

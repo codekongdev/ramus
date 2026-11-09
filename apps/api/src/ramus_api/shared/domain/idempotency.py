@@ -4,7 +4,11 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping
+from datetime import date
+from decimal import Decimal
+from enum import Enum
 from typing import Any
+from uuid import UUID
 
 from ramus_api.shared.domain.errors import BusinessError
 
@@ -16,9 +20,26 @@ def is_valid_idempotency_key(key: str) -> bool:
     return _KEY_PATTERN.fullmatch(key) is not None
 
 
+def _encode_non_json(value: object) -> Any:
+    """Encodes values that ``model_dump()`` commonly returns but JSON lacks. ``date`` covers ``datetime``."""
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, UUID | Decimal):
+        return str(value)
+    if isinstance(value, date):
+        return value.isoformat()
+    raise TypeError(f"Cannot fingerprint a value of type {type(value).__name__}")
+
+
 def fingerprint(payload: Mapping[str, Any]) -> str:
-    """SHA-256 of the payload as canonical JSON (sorted keys at every depth)."""
-    canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    """SHA-256 of the payload as canonical JSON (sorted keys at every depth).
+
+    UUID and Decimal become strings, date/datetime become ISO 8601, Enum becomes its value.
+    Any other non-JSON type raises TypeError naming the type.
+    """
+    canonical = json.dumps(
+        payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=_encode_non_json
+    )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 

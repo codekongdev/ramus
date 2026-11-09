@@ -56,3 +56,17 @@ def test_settings_are_immutable() -> None:
     settings = Settings(_env_file=None)
     with pytest.raises(ValidationError):
         settings.api_port = 9000
+
+
+@pytest.mark.parametrize("variable", ["RAMUS_API_PORT", "RAMUS_WEB_PORT"])
+def test_empty_port_environment_value_falls_back_to_default(monkeypatch: pytest.MonkeyPatch, variable: str) -> None:
+    monkeypatch.setenv(variable, "")
+    settings = Settings(_env_file=None)
+    assert (settings.api_port, settings.web_port) == (8000, 5173)
+
+
+def test_empty_port_values_in_env_file_fall_back_to_defaults(tmp_path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("RAMUS_API_PORT=\nRAMUS_WEB_PORT=\n")
+    settings = Settings(_env_file=env_file)
+    assert (settings.api_port, settings.web_port) == (8000, 5173)

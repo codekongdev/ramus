@@ -70,6 +70,14 @@ class SqlIdempotentExecutor:
         payload: Mapping[str, Any],
         operation: Operation,
     ) -> JsonObject:
+        """Runs ``operation`` at most once per ``(actor_id, scope, key)`` and replays its response.
+
+        Usage rule: ``operation`` must be a short database-only step inside this transaction. Do not
+        call external services (AI models, HTTP APIs, mail) from it. The receipt's unique-index lock is
+        held until the operation finishes, so a slow operation blocks every request with the same key
+        and holds a pooled connection for its whole duration. For AI work, the operation only
+        registers a run; the executor performs the model call separately (roadmap section 3).
+        """
         identity = (actor_id, scope, key)
         expected = fingerprint(payload)
         try:
