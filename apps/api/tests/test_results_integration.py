@@ -10,13 +10,14 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi.testclient import TestClient
 from login_flow import error_code, login, new_key, unique_email
-from sqlalchemy import insert, select, update
+from sqlalchemy import delete, insert, select, update
 
 from ramus_api.main import create_app
 from ramus_api.modules.access.fakes.services import FakeMailer
 from ramus_api.modules.execution.domain.models import RunPurpose
 from ramus_api.modules.execution.domain.snapshot import EMPTY_SNAPSHOT, snapshot_to_json
 from ramus_api.modules.execution.fakes.llm import FakeLLM
+from ramus_api.modules.results.domain.summary_chunks import SummaryLimits, input_size
 from ramus_api.orm_registry import metadata
 from ramus_api.shared.domain.primitives import utc_now
 
@@ -219,6 +220,95 @@ async def test_simultaneous_approvals_conflict_without_overwriting_and_replay_is
     revisions = table_rows(database, "result_revision", result_id=UUID(result_id))
     assert len(revisions) == 1
     assert fixture.result(result_id)["latest_version"] == 1
+
+
+@pytest.mark.parametrize("operation", ["summary", "approval"])
+@pytest.mark.asyncio
+async def test_receipt_replay_rechecks_project_membership(summary_fixture, database, operation):
+    fixture = summary_fixture
+    summary_key = new_key()
+    created = fixture.summary(headers=summary_key)
+    assert created.status_code == 200, created.text
+    result_id, run_id = created.json()["id"], created.json()["draft"]["run_id"]
+
+    if operation == "summary":
+        original = created
+
+        def replay():
+            return fixture.summary(headers=summary_key)
+    else:
+        await fixture.app.state.container.execution_runtime.worker.run_once()
+        save_key = new_key()
+        original = fixture.save(result_id, run_id, headers=save_key)
+        assert original.status_code == 200, original.text
+
+        def replay():
+            return fixture.save(result_id, run_id, headers=save_key)
+
+    assert replay().json() == original.json()
+    with database.transaction() as session:
+        membership = metadata.tables["membership"]
+        session.execute(delete(membership).where(
+            membership.c.project_id == fixture.project_id,
+            membership.c.account_id == fixture.account_id,
+        ))
+
+    rejected = replay()
+    assert rejected.status_code == 404, rejected.text
+    assert error_code(rejected) == "NOT_FOUND"
+    assert fixture.client.get(f"/api/results/{result_id}").status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_long_summary_uses_bounded_calls_with_pinned_sources_and_requesters_connection(summary_fixture, database):
+    fixture = summary_fixture
+    created = fixture.summary().json()
+    result_id = created["id"]
+    await fixture.app.state.container.execution_runtime.worker.run_once()
+    approved = fixture.save(result_id, created["draft"]["run_id"]).json()
+    before = len(fixture.gateway.calls)
+    for _ in range(3):
+        last_seq = add_message(database, fixture, "새 조건을 검토합니다." * 1200)
+
+    updated = fixture.summary(client=fixture.editor).json()
+    await fixture.app.state.container.execution_runtime.worker.run_once()
+    result = fixture.result(result_id)
+    assert result["draft"]["status"] == "ready"
+    assert result["latest_revision_id"] == approved["id"]
+    calls = fixture.gateway.calls[before:]
+    assert len(calls) > 1
+    for request in calls:
+        assert input_size(request) <= SummaryLimits().input_bytes
+        assert request.credential_account_id == fixture.editor_id
+        assert request.message_to_seq == last_seq
+        assert UUID(approved["id"]) in {item.result_revision_id for item in request.context.results}
+    saved = fixture.save(result_id, updated["draft"]["run_id"], version=1)
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["version"] == 2
+
+
+@pytest.mark.asyncio
+async def test_summary_source_limit_has_actionable_error_and_preserves_approved_version(summary_fixture, database):
+    fixture = summary_fixture
+    created = fixture.summary().json()
+    result_id = created["id"]
+    await fixture.app.state.container.execution_runtime.worker.run_once()
+    approved = fixture.save(result_id, created["draft"]["run_id"]).json()
+    before = len(fixture.gateway.calls)
+    for _ in range(24):
+        add_message(database, fixture, "한" * 16_000)
+
+    updated = fixture.summary().json()
+    await fixture.app.state.container.execution_runtime.worker.run_once()
+    result = fixture.result(result_id)
+    assert result["draft"]["status"] == "failed"
+    assert result["draft"]["error"]["code"] == "SUMMARY_LIMIT_EXCEEDED"
+    assert "처리 한도" in result["draft"]["error"]["message"]
+    assert result["latest_revision_id"] == approved["id"] and result["latest_version"] == 1
+    assert len(fixture.gateway.calls) == before
+    assert fixture.client.get(f"/api/tasks/{fixture.task_id}").json()["status"] == "ready"
+    run = table_rows(database, "run", id=UUID(updated["draft"]["run_id"]))[0]
+    assert run["status"] == "failed" and run["error_code"] == "SUMMARY_LIMIT_EXCEEDED"
 
 
 @pytest.mark.asyncio

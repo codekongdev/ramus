@@ -1,4 +1,4 @@
-# ramus 계약 v1.6
+# ramus 계약 v1.7
 
 확정일: 2026-11-09 · 작업자: 메이슨, 헤이든 · 상태: 확정
 
@@ -84,6 +84,7 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 | `LLM_UNAVAILABLE` | 모델 호출 실패, 결과 반영 중 오류처럼 원인을 사용자에게 구분해 알릴 필요가 없는 실패 |
 | `LLM_OUTPUT_INVALID` | 모델 출력이 6.1의 스키마와 맞지 않음 |
 | `LLM_TIMEOUT` | 모델 응답이 제한 시간 안에 오지 않음 |
+| `SUMMARY_LIMIT_EXCEEDED` | 결과 정리의 원문 크기·호출 수·종합 단계가 처리 한도를 넘음. 원문을 조용히 잘라내지 않고 정리를 실패로 표시하며 기존 승인 버전을 보존 |
 | `RUN_INTERRUPTED` | running 상태에서 heartbeat가 끊김(서버 재시작 등). 자동으로 다시 실행하지 않는다(C8) |
 | `RUN_TIMED_OUT` | pending 상태로 너무 오래 대기함(F-03) |
 | `RUN_CREDENTIAL_MISMATCH` | 핸들러가 만든 모델 요청의 키 계정이 실행의 `credential_account_id`와 다름. 모델을 호출하지 않는다(ON-AC-08) |
@@ -364,6 +365,7 @@ export type TaskModalProps = {
 
 | 날짜 | 버전 | 내용 |
 |---|---|---|
+| 2026-11-09 | v1.7 | B4 추가 검수: 긴 정리의 구간별 추출·종합 한도 실패 코드 `SUMMARY_LIMIT_EXCEEDED` 추가. 정리·승인 멱등 재전송에서도 현재 참여 권한을 확인 |
 | 2026-11-09 | v1.6 | B4: 정리 요청 시점 입력 고정용 `result_draft.context_snapshot`, 승인 저장의 필수 `source_run_id` 추가. 기준 버전이 같아도 재생성된 초안과 다른 출처로 편집 본문을 저장하면 409 |
 | 2026-11-09 | v1.5 | A5 work 입력의 메시지 범위, 현재 업무 Run의 Task 상태·이벤트 동기화, 대화 입력·Task 결과 조회 포트(6장·6.2). HTTP·SSE 페이로드와 테이블 스키마는 변경하지 않음 |
 | 2026-11-09 | v1.4 | A1: 참여자 조회, 인증 입력 검증, 이메일·IP 시간당 상한, HMAC과 세션 재발급 상한 |

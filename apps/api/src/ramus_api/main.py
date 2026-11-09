@@ -47,6 +47,7 @@ from ramus_api.modules.realtime.infrastructure.broker import InProcessEventBroke
 from ramus_api.modules.realtime.presentation.routes import register as register_realtime
 from ramus_api.modules.resources.infrastructure.context_provider import build_context_provider
 from ramus_api.modules.resources.presentation.routes import register as register_resources
+from ramus_api.modules.results.application.long_summary import LongSummaryGateway
 from ramus_api.modules.results.application.summary import SummaryPurposeHandler
 from ramus_api.modules.results.infrastructure.repository import SqlResultRepository
 from ramus_api.modules.results.presentation.routes import register as register_results
@@ -128,7 +129,7 @@ def build_container(
     runtime = build_work_execution_runtime(
         transaction=database.transaction,
         publisher=events,
-        gateway=gateway,
+        gateway=LongSummaryGateway(gateway),
         context_provider=build_context_provider(),
         connections=SqlAiConnectionQuery(),
         writer=SqlConversationWriter(SqlConversationRepository(), CommittedEvents(container)),
