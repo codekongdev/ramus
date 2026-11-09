@@ -1,6 +1,6 @@
 import type { ProjectEvent } from '../../lib/events';
 import { next, type Next } from '../../lib/mvi';
-import type { ResultRevision } from '../results/contract';
+import type { ResultRevision } from '../../lib/api/result-contract';
 import type { ConversationInput } from './contract';
 
 export type ReceivedState = {

@@ -1,5 +1,5 @@
 import { next, type Next } from '../../lib/mvi';
-import type { ResultRevision } from '../results/contract';
+import type { ResultRevision } from '../../lib/api/result-contract';
 import type { Conversation, ShareOutcomes } from './contract';
 import { sharingMessages as m } from './messages';
 

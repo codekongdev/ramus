@@ -291,6 +291,13 @@ test('conclusion reading preserves the parent draft, route and scroll and never 
   await expect(reader.getByRole('textbox')).toHaveCount(0);
   await expect(reader.getByText('출처 정보', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: 'artifacts/b5-conclusion-desktop.png', fullPage: true });
+  const readerElement = await reader.elementHandle();
+  await reader.getByRole('button', { name: '다른 대화에 보내기', exact: true }).click();
+  await expect(reader.getByLabel('대화 검색', { exact: true })).toBeVisible();
+  await expect(page.locator('dialog[open]')).toHaveCount(1);
+  await reader.getByRole('button', { name: '결론으로 돌아가기', exact: true }).click();
+  expect(await reader.evaluate((node, original) => node === original, readerElement)).toBe(true);
+  await expect(reader.getByRole('button', { name: '다른 대화에 보내기', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.locator('dialog[open]').getByRole('tab', { name: '결과', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('dialog[open]').getByRole('button', { name: '결론 보기', exact: true })).toBeFocused();

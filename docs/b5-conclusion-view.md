@@ -16,10 +16,11 @@
 
 ## 검증 (2026-11-09)
 
-- `pnpm verify`: 9개 검사 PASS, FAIL/SKIP 없음. API 단위 621개·통합 238개와 OpenAPI/생성 타입 계약 검사 포함.
-- 후속 UI 보완 뒤 `pnpm verify --only web,i18n`: 타입 검사·프론트 45파일/448테스트·문구 검사 통과. 마지막 충돌 안내 보완 뒤 관련 5파일/39테스트도 통과.
+- B6 통합 후 `pnpm verify`: 9개 검사 PASS, FAIL/SKIP 없음. 프론트 48파일/457테스트·API 단위 623개·통합 251개와 OpenAPI/생성 타입 계약 검사 포함.
+- 결과 응답 파서를 `lib/api/result-contract.ts`로 옮겨 공유하며 기능 간 내부 import를 제거했다. 후속 웹 검사로 타입·단위·문구 검사를 확인했다.
 - `pnpm --filter @ramus/web build`: 프로덕션 빌드 통과.
 - `pnpm test:e2e tests/e2e/results.spec.ts`: 8개 통과. 실제 격리 DB의 저장·재열람, 열기·닫기의 변경 요청 부재, 부모 초안·스크롤·URL·포커스 유지, 실시간 갱신 중 과거 버전 유지, 375px 긴 본문·동일 너비 버튼 확인.
+- `pnpm test:e2e tests/e2e/results.spec.ts tests/e2e/sharing.spec.ts`: B6 통합 후 9개 통과. 실제 수신 목록에서 공용 결론 보기·닫기 무변경·전달·새 버전 명시적 재전송을 검증했다.
 - 별도 로컬 Vite 서버를 지정한 `RAMUS_WEB_PORT=5185 pnpm test:e2e tests/e2e/task-ui.spec.ts`: 기존 작업 모달 3개 통과. 이 파일은 서버 fixture를 사용하지 않으므로 먼저 개발 서버를 실행해야 한다.
 - `git diff --check` 통과. 데스크톱·모바일 캡처는 로컬 `artifacts/b5-conclusion-{desktop,mobile}.png`에서 확인했다.
 - 기존 React `act` 및 Starlette deprecation 경고가 있다. 실제 모델 호출과 B7 새 대화 생성은 검증하지 않았다.
