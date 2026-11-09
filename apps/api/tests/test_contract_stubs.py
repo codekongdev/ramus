@@ -1,4 +1,7 @@
-"""Stub routes fail with 501 NOT_IMPLEMENTED; the Idempotency-Key header is checked first."""
+"""Stub routes fail with 501 NOT_IMPLEMENTED; the Idempotency-Key header is checked first.
+
+Implemented endpoints leave the 501 check but keep the Idempotency-Key check.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +16,10 @@ from ramus_api.settings import Settings
 
 KEY = {"Idempotency-Key": "test-key-1"}
 ID = str(uuid4())
+
+# P0-A4 login; covered by test_access_*_integration.py.
+IMPLEMENTED = frozenset({"requestEmailCode", "verifyEmailCode", "logout", "getMe"})
+STUBS = tuple(e for e in CONTRACT_ENDPOINTS if e.operation_id not in IMPLEMENTED)
 
 BODIES: dict[str, dict] = {
     "requestEmailCode": {"email": "a@example.com"},
@@ -79,7 +86,7 @@ def _ids(endpoints) -> list[str]:
     return [e.operation_id for e in endpoints]
 
 
-@pytest.mark.parametrize("endpoint", CONTRACT_ENDPOINTS, ids=_ids(CONTRACT_ENDPOINTS))
+@pytest.mark.parametrize("endpoint", STUBS, ids=_ids(STUBS))
 def test_every_stub_returns_501_with_a_korean_message(client: TestClient, endpoint: Endpoint) -> None:
     response = _send(client, endpoint, KEY if endpoint.is_change else {})
     assert response.status_code == 501

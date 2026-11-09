@@ -6,7 +6,7 @@ from ramus_api.settings import DEFAULT_DATABASE_URL, Settings
 
 @pytest.fixture(autouse=True)
 def clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in ("DATABASE_URL", "RAMUS_API_PORT", "RAMUS_WEB_PORT"):
+    for name in ("DATABASE_URL", "RAMUS_API_PORT", "RAMUS_WEB_PORT", "RAMUS_COOKIE_SECURE"):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -70,3 +70,19 @@ def test_empty_port_values_in_env_file_fall_back_to_defaults(tmp_path) -> None:
     env_file.write_text("RAMUS_API_PORT=\nRAMUS_WEB_PORT=\n")
     settings = Settings(_env_file=env_file)
     assert (settings.api_port, settings.web_port) == (8000, 5173)
+
+
+def test_session_cookie_is_not_secure_by_default() -> None:
+    assert Settings(_env_file=None).cookie_secure is False
+
+
+@pytest.mark.parametrize(("value", "expected"), [("true", True), ("1", True), ("false", False), ("0", False)])
+def test_cookie_secure_is_read_from_environment(monkeypatch: pytest.MonkeyPatch, value: str, expected: bool) -> None:
+    monkeypatch.setenv("RAMUS_COOKIE_SECURE", value)
+    assert Settings(_env_file=None).cookie_secure is expected
+
+
+def test_invalid_cookie_secure_value_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RAMUS_COOKIE_SECURE", "sometimes")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)

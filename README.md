@@ -50,10 +50,14 @@ uv run --project apps/api python -m ramus_api.modules.seed
 
 이 명령은 고정 시드 키에서 UUIDv5를 만들고 `project_id`를 JSON으로 출력한다.
 여러 번 또는 동시에 실행해도 프로젝트와 시드 표식은 하나만 생성하며, 기존 이름과 데이터를 유지한다.
-예시 대화·자료·결과 콘텐츠와 로그인 참여자 등록은 후속 작업에서 추가한다.
+예시 대화·자료·결과 콘텐츠는 후속 작업에서 추가한다.
+로그인하면 공동 샘플 프로젝트에 편집 참여자로 자동 등록된다. 시드 명령을 실행하지 않았어도 첫 로그인 때 프로젝트가 만들어진다.
 
 API는 `uv run --project apps/api python -m ramus_api`, 웹은 `pnpm --filter @ramus/web dev`로 띄운다.
 웹 개발 서버는 `/api` 요청을 `RAMUS_API_PORT`로 넘긴다.
+
+개발 환경에서는 메일을 보내지 않는다. 로그인 인증 코드는 API 서버 터미널 로그에 `[DEV MAIL - not sent]` 줄로 출력된다.
+HTTPS로 서비스하는 환경에서는 `RAMUS_COOKIE_SECURE=true`로 세션 쿠키에 `Secure`를 붙인다.
 
 테스트(`uv run --project apps/api pytest`)는 `DATABASE_URL`의 개발용 DB를 쓰지 않는다.
 같은 서버에 `ramus_test_<무작위>` 임시 DB를 매번 만들어 마이그레이션하고, 끝나면 지운다.

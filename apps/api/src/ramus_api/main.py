@@ -6,13 +6,22 @@ There is no module-level app; servers use the factory (``uvicorn --factory ramus
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from functools import partial
+from uuid import UUID
 
 from fastapi import FastAPI
+from sqlalchemy.orm import Session
 
 from ramus_api.container import AppContainer, ModuleRegistrar
+from ramus_api.modules.access.application.ports import Mailer
+from ramus_api.modules.access.infrastructure.mailer import LoggingMailer
 from ramus_api.modules.access.presentation.routes import register as register_access
 from ramus_api.modules.conversations.presentation.routes import register as register_conversations
 from ramus_api.modules.execution.presentation.routes import register as register_execution
+from ramus_api.modules.projects.infrastructure.sample import (
+    SHARED_SAMPLE_PROJECT_ID,
+    ensure_shared_sample_project,
+)
 from ramus_api.modules.projects.presentation.routes import register as register_projects
 from ramus_api.modules.realtime.presentation.routes import register as register_realtime
 from ramus_api.modules.resources.presentation.routes import register as register_resources
@@ -26,9 +35,21 @@ from ramus_api.shared.presentation import ERROR_RESPONSES, install_error_handler
 API_TITLE = "Ramus API"
 API_VERSION = "0.1.0"
 
+
+class SharedSampleProject:
+    """Connects access's ``SharedProjectProvider`` port to the projects module's shared sample."""
+
+    @property
+    def project_id(self) -> UUID:
+        return SHARED_SAMPLE_PROJECT_ID
+
+    def ensure_shared_project(self, transaction: Session) -> UUID:
+        return ensure_shared_sample_project(transaction)
+
+
 MODULES: tuple[ModuleRegistrar, ...] = (
     register_system,
-    register_access,
+    partial(register_access, shared_project=SharedSampleProject()),
     register_projects,
     register_conversations,
     register_execution,
@@ -39,14 +60,20 @@ MODULES: tuple[ModuleRegistrar, ...] = (
 )
 
 
-def build_container(settings: Settings) -> AppContainer:
+def build_container(settings: Settings, mailer: Mailer | None = None) -> AppContainer:
+    """``mailer`` defaults to the development ``LoggingMailer``, which prints codes to the server log."""
     database = Database(settings.database_url)
-    return AppContainer(settings=settings, database=database, idempotency=SqlIdempotentExecutor(database))
+    return AppContainer(
+        settings=settings,
+        database=database,
+        idempotency=SqlIdempotentExecutor(database),
+        mailer=mailer if mailer is not None else LoggingMailer(),
+    )
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, mailer: Mailer | None = None) -> FastAPI:
     """Builds the app without connecting to the database; connections open on first use."""
-    container = build_container(settings or Settings())
+    container = build_container(settings or Settings(), mailer)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:

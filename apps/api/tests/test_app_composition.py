@@ -6,6 +6,8 @@ from fastapi.testclient import TestClient
 from ramus_api import main
 from ramus_api.container import AppContainer
 from ramus_api.modules import system
+from ramus_api.modules.access.fakes.services import FakeMailer
+from ramus_api.modules.access.infrastructure.mailer import LoggingMailer
 from ramus_api.settings import Settings
 
 UNREACHABLE_DATABASE_URL = "postgresql+psycopg://nobody:nothing@127.0.0.1:1/nowhere"
@@ -38,6 +40,13 @@ def test_each_module_receives_the_shared_container(monkeypatch) -> None:
     assert container.settings is settings
     assert container.database is not None
     assert container.idempotency is not None
+
+
+def test_container_uses_the_logging_mailer_unless_one_is_injected() -> None:
+    settings = Settings(_env_file=None, database_url=UNREACHABLE_DATABASE_URL)
+    assert isinstance(main.create_app(settings).state.container.mailer, LoggingMailer)
+    fake = FakeMailer()
+    assert main.create_app(settings, mailer=fake).state.container.mailer is fake
 
 
 def test_importing_main_does_not_build_an_app() -> None:
