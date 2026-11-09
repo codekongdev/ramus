@@ -9,6 +9,7 @@ Development conventions and environment setup.
 - [B1 shared skills and resources](docs/b1-resources-ui.md): Register, import, search, and apply pinned resource versions
 - [B2 resource revision management](docs/b2-resource-revisions.md): Resource history, editing, conflicts, and explicit version application
 - [B6 conclusion sharing](docs/b6-sharing.md): Send pinned conclusions to multiple conversations, receive and forward them, and explicitly replace input versions
+- [B8 results library](docs/b8-results-library.md): Read-only project library of saved conclusions, sources, and latest approved versions
 - `apps/web/`: React · TypeScript · Vite · Vitest setup
 - `apps/api/`: Python · FastAPI · Ruff · pytest setup
 - `compose.yaml`: Local PostgreSQL configuration
@@ -77,7 +78,9 @@ sessions, AI connections, memberships, project names, and unrelated projects. Ac
 or another project's references to the sample conclusions prevent reset and roll back changes.
 There is no HTTP endpoint or product button for reset. See [B9 sample preparation](docs/b9-seed-content.md) for scope
 and local verification. B6 conclusion sharing is connected to the product UI and pinned AI inputs.
-Follow-up conversation creation and the results library remain dependent on B7–B8 integration for the full product E2E.
+Follow-up conversation creation remains dependent on B7 integration for the full product E2E.
+The left **결과물** menu lists the current project's saved conclusions with their source conversation,
+latest approved version, and save time. Unsaved drafts are excluded.
 
 ## Conversation and message backend (A2)
 

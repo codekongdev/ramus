@@ -11,6 +11,7 @@ import { useModalHost } from '../modal/ModalHost';
 import { navigate } from '../routing/useRoute';
 import { ResourcesMenuButton } from '../../features/resources';
 import { ReceivedResults, ReceivedResultDialog, type ConversationInput } from '../../features/sharing';
+import { ResultsLibraryMenuButton } from '../../features/results-library';
 
 export type WorkspacePageProps = {
   readonly projectId: string;
@@ -58,7 +59,10 @@ export function WorkspacePage({
     render: close => <ReceivedResultDialog key={input.result_revision_id} projectId={projectId} input={input} onClose={close} />,
   }), [openModal, projectId]);
   return <AppShell project={header.project} participants={header.participants} {...slots}
-    workspaceMenu={slots?.workspaceMenu ?? <ResourcesMenuButton projectId={projectId} conversationId={conversationId} />}
+    workspaceMenu={slots?.workspaceMenu ?? <>
+      <ResultsLibraryMenuButton projectId={projectId} />
+      <ResourcesMenuButton projectId={projectId} conversationId={conversationId} />
+    </>}
     conversation={slots?.conversation ?? <Conversation projectId={projectId} conversationId={conversationId} ensureAiConnection={ensureAiConnection} />}
     conversationTree={projectId && <TaskConversationTree projectId={projectId} conversationId={conversationId}
       onSelectConversation={selectConversation} onInitialConversation={selectInitialConversation}

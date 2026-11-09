@@ -69,6 +69,17 @@
   min-width: 0;
 }
 
+.app-shell__slot[data-slot="workspace-menu"] {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(var(--spacing) * 1);
+}
+
+.app-shell__slot[data-slot="workspace-menu"] > button {
+  justify-content: flex-start;
+}
+
 .app-shell__scroll {
   min-height: 0;
   overflow: auto;
