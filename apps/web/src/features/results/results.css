@@ -14,3 +14,10 @@
 .task-result__source summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .task-result__error { display: flex; flex-direction: column; gap: calc(var(--spacing) * 3); color: var(--destructive); overflow-wrap: anywhere; }
 .task-result__history { display: flex; flex-direction: column; gap: calc(var(--spacing) * 2); }
+.conclusion-view { display: flex; flex-direction: column; gap: calc(var(--spacing) * 5); min-width: 0; }
+.conclusion-view__body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; }
+.conclusion-view h3 { margin: 0; font-size: var(--text-sm); }
+.conclusion-view__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--spacing) * 3); }
+.conclusion-view__actions > button { min-width: 0; min-height: 44px; height: auto; white-space: normal; overflow-wrap: anywhere; }
+.ramus.conclusion-dialog { width: min(640px, calc(100vw - 32px)); }
+.conclusion-dialog .h-dialog-body { max-height: 70dvh; overflow-y: auto; }

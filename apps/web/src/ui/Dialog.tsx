@@ -33,6 +33,7 @@ export function Dialog({ open, onOpenChange, title, headerActions, children, foo
   const effectiveOpen = open && visible;
   const titleId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const focusedInside = useRef<HTMLElement | null>(null);
   const latest = useRef({ open: effectiveOpen, onOpenChange });
   useEffect(() => {
     latest.current = { open: effectiveOpen, onOpenChange };
@@ -43,7 +44,9 @@ export function Dialog({ open, onOpenChange, title, headerActions, children, foo
     if (!dialog || !effectiveOpen) return;
     const active = dialog.ownerDocument.activeElement;
     const opener = active instanceof HTMLElement ? active : null;
+    const restoreInside = focusedInside.current;
     if (!dialog.open) dialog.showModal();
+    if (restoreInside?.isConnected && dialog.contains(restoreInside)) restoreInside.focus({ preventScroll: true });
     return () => {
       // Runs on controlled close, unmount and StrictMode effect replay.
       if (dialog.open) dialog.close();
@@ -62,6 +65,7 @@ export function Dialog({ open, onOpenChange, title, headerActions, children, foo
       data-contrast={UI_CONTRAST}
       className={['ramus', 'h-dialog', 'ui-dialog', className].filter(Boolean).join(' ')}
       aria-labelledby={titleId}
+      onFocusCapture={event => { if (event.target instanceof HTMLElement) focusedInside.current = event.target; }}
       hidden={!visible}
       onCancel={(event) => {
         event.preventDefault();

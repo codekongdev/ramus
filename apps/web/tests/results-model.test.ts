@@ -130,4 +130,43 @@ describe('result reducer', () => {
     expect(resultReducer({ ...ready(), editor: { text: '  ', dirty: true, baseVersion: 0, sourceRunId: 'summary1' } }, { type: 'save', key: 'blank' }).effects).toEqual([]);
     expect(resultReducer({ ...ready(), result: { ...result, draft: { ...result.draft!, status: 'generating' } } }, { type: 'save', key: 'busy' }).effects).toEqual([]);
   });
+  it('pins the explicitly viewed history revision while realtime refresh discovers newer approvals', () => {
+    const original = { ...ready(), result: approved, approved: revision, viewed: revision, editor: null };
+    const selected = resultReducer(original, { type: 'selectRevision', revisionId: revision.id }).state;
+    expect(selected.viewed).toBeNull();
+    const viewed = resultReducer(selected, { type: 'revisionLoaded', taskId: task.id, request: selected.revisionRequest, revision }).state;
+    const latest = { ...revision, id: 'revision2', version: 2, conclusion: '새 승인 결론' };
+    const refresh = resultReducer(viewed, { type: 'refresh' }).state;
+    const updated = resultReducer(refresh, { type: 'loaded', taskId: task.id, request: refresh.request,
+      result: { ...approved, latest_revision_id: latest.id, latest_version: 2 }, approved: latest }).state;
+    expect(updated.approved).toEqual(latest);
+    expect(updated.viewed).toEqual(revision);
+  });
+  it('invalidates a pending history request after a new version is saved', () => {
+    const saving = resultReducer({ ...ready(), result: approved, approved: revision, viewed: revision }, { type: 'save', key: 'save2' }).state;
+    const selecting = resultReducer(saving, { type: 'selectRevision', revisionId: revision.id }).state;
+    const latest = { ...revision, id: 'revision2', version: 2 };
+    const saved = resultReducer(selecting, { type: 'saved', taskId: task.id, key: 'save2', revision: latest }).state;
+    expect(saved.viewed).toEqual(latest);
+    expect(resultReducer(saved, { type: 'revisionLoaded', taskId: task.id, request: selecting.revisionRequest, revision }).state).toBe(saved);
+  });
+  it('retries the exact history revision after a failed read', () => {
+    const selected = resultReducer({ ...ready(), result: approved, viewed: revision }, { type: 'selectRevision', revisionId: revision.id }).state;
+    const failed = resultReducer(selected, { type: 'revisionFailed', taskId: task.id, request: selected.revisionRequest, message: '읽기 실패' }).state;
+    const retried = resultReducer(failed, { type: 'retryRead' });
+    expect(retried.effects).toEqual([{ type: 'revision', taskId: task.id, resultId: result.id, revisionId: revision.id, request: selected.revisionRequest + 1 }]);
+    expect(resultReducer(retried.state, { type: 'revisionLoaded', taskId: task.id, request: retried.state.revisionRequest, revision }).state.viewed).toEqual(revision);
+  });
+  it('explicitly releases a history pin when reviewing the latest approval after conflict', () => {
+    const selected = resultReducer({ ...ready(), result: approved, approved: revision, viewed: revision, conflict: true, error: '충돌 안내' }, { type: 'selectRevision', revisionId: revision.id }).state;
+    expect(selected.error).toBe('충돌 안내');
+    const reviewed = resultReducer(selected, { type: 'reviewLatest' }).state;
+    expect(reviewed.viewedRevisionId).toBeNull();
+    expect(reviewed.editor).toEqual(selected.editor);
+    const latest = { ...revision, id: 'revision2', version: 2 };
+    const loaded = resultReducer(reviewed, { type: 'loaded', taskId: task.id, request: reviewed.request,
+      result: { ...approved, latest_revision_id: latest.id, latest_version: 2 }, approved: latest }).state;
+    expect(loaded.viewed).toEqual(latest);
+    expect(resultReducer(loaded, { type: 'revisionLoaded', taskId: task.id, request: selected.revisionRequest, revision }).state).toBe(loaded);
+  });
 });

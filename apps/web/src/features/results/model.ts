@@ -15,6 +15,8 @@ export type ResultState = {
   readonly result: Result | null;
   readonly approved: ResultRevision | null;
   readonly viewed: ResultRevision | null;
+  /** null follows the latest approval; an explicit history selection stays pinned. */
+  readonly viewedRevisionId: string | null;
   readonly editor: Editor | null;
   readonly loading: boolean;
   readonly request: number;
@@ -32,6 +34,8 @@ export type ResultEffect =
 export type ResultIntent =
   | { readonly type: 'taskChanged'; readonly task: Task }
   | { readonly type: 'refresh' }
+  | { readonly type: 'retryRead' }
+  | { readonly type: 'reviewLatest' }
   | { readonly type: 'loaded'; readonly taskId: string; readonly request: number; readonly result: Result; readonly approved: ResultRevision | null }
   | { readonly type: 'loadFailed'; readonly taskId: string; readonly request: number; readonly message: string }
   | { readonly type: 'summarize'; readonly key: string }
@@ -50,7 +54,7 @@ export type ResultIntent =
   | { readonly type: 'serverEvent'; readonly event: ProjectEvent };
 
 export const initialResultState = (taskId: string): ResultState => ({
-  taskId, taskStatus: null, resultId: null, result: null, approved: null, viewed: null, editor: null,
+  taskId, taskStatus: null, resultId: null, result: null, approved: null, viewed: null, viewedRevisionId: null, editor: null,
   loading: false, request: 0, revisionRequest: 0, error: null, conflict: false, notice: null, mutation: null, failedMutation: null,
 });
 export const generating = (state: ResultState) => state.result?.draft?.status === 'generating' || state.mutation?.kind === 'summary';
@@ -75,10 +79,15 @@ export function resultReducer(state: ResultState, intent: ResultIntent): Next<Re
       return changed ? refresh(updated) : next(updated);
     }
     case 'refresh': return refresh(state);
+    case 'retryRead':
+      return state.viewedRevisionId && !state.viewed
+        ? resultReducer(state, { type: 'selectRevision', revisionId: state.viewedRevisionId }) : refresh(state);
+    case 'reviewLatest':
+      return refresh({ ...state, viewedRevisionId: null, viewed: state.approved, revisionRequest: state.revisionRequest + 1 });
     case 'loaded': {
       if (intent.taskId !== state.taskId || intent.request !== state.request) return next(state);
       const retain = state.editor && (state.editor.dirty || state.conflict);
-      return next({ ...state, result: intent.result, approved: intent.approved, viewed: intent.approved,
+      return next({ ...state, result: intent.result, approved: intent.approved, viewed: state.viewedRevisionId ? state.viewed : intent.approved,
         editor: retain ? state.editor : editorFor(intent.result), loading: false,
         error: state.conflict ? messages.conflict : null });
     }
@@ -106,7 +115,7 @@ export function resultReducer(state: ResultState, intent: ResultIntent): Next<Re
         ? { ...state.editor, baseVersion: intent.revision.version } : null;
       const result = state.result && { ...state.result, latest_version: intent.revision.version, latest_revision_id: intent.revision.id,
         revisions: [...state.result.revisions.filter(revision => revision.id !== intent.revision.id), { id: intent.revision.id, version: intent.revision.version, saved_by: intent.revision.saved_by, created_at: intent.revision.created_at }] };
-      return refresh({ ...state, result, approved: intent.revision, viewed: intent.revision, editor, mutation: null, failedMutation: null, conflict: false, notice: messages.saved(intent.revision.version) });
+      return refresh({ ...state, result, approved: intent.revision, viewed: intent.revision, viewedRevisionId: null, revisionRequest: state.revisionRequest + 1, editor, mutation: null, failedMutation: null, conflict: false, notice: messages.saved(intent.revision.version) });
     }
     case 'mutationCancelled':
       return intent.taskId === state.taskId && state.mutation?.key === intent.key ? next({ ...state, mutation: null }) : next(state);
@@ -128,10 +137,11 @@ export function resultReducer(state: ResultState, intent: ResultIntent): Next<Re
     case 'selectRevision': {
       if (!state.resultId || !state.result?.revisions.some(revision => revision.id === intent.revisionId)) return next(state);
       const request = state.revisionRequest + 1;
-      return next({ ...state, revisionRequest: request }, { type: 'revision', taskId: state.taskId, resultId: state.resultId, revisionId: intent.revisionId, request });
+      return next({ ...state, revisionRequest: request, viewedRevisionId: intent.revisionId, viewed: null, error: state.conflict ? state.error : null }, { type: 'revision', taskId: state.taskId, resultId: state.resultId, revisionId: intent.revisionId, request });
     }
     case 'revisionLoaded':
-      return intent.taskId === state.taskId && intent.request === state.revisionRequest ? next({ ...state, viewed: intent.revision }) : next(state);
+      return intent.taskId === state.taskId && intent.request === state.revisionRequest && intent.revision.id === state.viewedRevisionId && intent.revision.result_id === state.resultId
+        ? next({ ...state, viewed: intent.revision }) : next(state);
     case 'revisionFailed':
       return intent.taskId === state.taskId && intent.request === state.revisionRequest ? next({ ...state, error: intent.message }) : next(state);
     case 'serverEvent': {
