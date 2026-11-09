@@ -2,8 +2,9 @@
 
 from dataclasses import asdict
 
-from ramus_api.modules.results.domain.records import ResultRecord, Revision
+from ramus_api.modules.results.domain.records import ProjectResult, ResultRecord, Revision
 from ramus_api.modules.results.presentation.dto import (
+    ProjectResultSummary,
     Result,
     ResultDraft,
     ResultRevision,
@@ -31,3 +32,7 @@ def result_dto(record: ResultRecord) -> Result:
 
 def revision_dto(record: Revision) -> ResultRevision:
     return ResultRevision(**asdict(record))
+
+
+def project_result_dto(record: ProjectResult) -> ProjectResultSummary:
+    return ProjectResultSummary(**asdict(record))

@@ -53,3 +53,23 @@ class ResultRecord:
     latest_version: int
     draft: Draft | None
     revisions: tuple[Revision, ...]
+
+
+@dataclass(frozen=True)
+class ApprovedResult:
+    result_id: UUID
+    title: str
+    latest_version: int
+    latest_revision_id: UUID
+    source_conversation_id: UUID
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class ProjectResult:
+    result_id: UUID
+    title: str
+    latest_version: int
+    latest_revision_id: UUID
+    source_conversation_title: str
+    updated_at: datetime

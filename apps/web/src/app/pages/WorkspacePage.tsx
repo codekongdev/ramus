@@ -11,6 +11,7 @@ import { useModalHost } from '../modal/ModalHost';
 import { navigate } from '../routing/useRoute';
 import { ResourcesMenuButton } from '../../features/resources';
 import { ReceivedResults, ReceivedResultDialog, SendConclusion, useSendConclusion, type ConversationInput } from '../../features/sharing';
+import { ResultsLibraryMenuButton } from '../../features/results-library';
 
 /** Compose result reading and sending without feature-to-feature imports. */
 function WorkspaceConclusion({ revision, projectId, conversationId, actions }: {
@@ -96,7 +97,10 @@ export function WorkspacePage({
         onSendToConversation={conclusionActions?.onSendToConversation ?? controls.onSendToConversation} />} />,
   }), [openModal, projectId, conclusionActions]);
   return <AppShell project={header.project} participants={header.participants} {...slots}
-    workspaceMenu={slots?.workspaceMenu ?? <ResourcesMenuButton projectId={projectId} conversationId={conversationId} />}
+    workspaceMenu={slots?.workspaceMenu ?? <>
+      <ResultsLibraryMenuButton projectId={projectId} />
+      <ResourcesMenuButton projectId={projectId} conversationId={conversationId} />
+    </>}
     conversation={slots?.conversation ?? <Conversation projectId={projectId} conversationId={conversationId} ensureAiConnection={ensureAiConnection} />}
     conversationTree={projectId && <TaskConversationTree projectId={projectId} conversationId={conversationId}
       onSelectConversation={selectConversation} onInitialConversation={selectInitialConversation}

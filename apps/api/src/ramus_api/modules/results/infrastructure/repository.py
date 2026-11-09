@@ -7,7 +7,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from ramus_api.modules.execution.domain.models import ConversationContext, ResourceInput, ResultInput
-from ramus_api.modules.results.domain.records import Draft, ResultRecord, Revision, Source
+from ramus_api.modules.results.domain.records import ApprovedResult, Draft, ResultRecord, Revision, Source
 from ramus_api.modules.results.infrastructure.models import ResultDraftRow, ResultRevisionRow, ResultRow
 from ramus_api.shared.domain.primitives import utc_now
 
@@ -43,6 +43,18 @@ def _revision(row: ResultRevisionRow) -> Revision:
 
 
 class SqlResultRepository:
+    def approved_for_project(self, session: Session, project_id: UUID) -> tuple[ApprovedResult, ...]:
+        rows = session.execute(
+            select(
+                ResultRow.id, ResultRevisionRow.title, ResultRevisionRow.version,
+                ResultRevisionRow.id, ResultRow.source_conversation_id, ResultRevisionRow.created_at,
+            )
+            .join(ResultRevisionRow, ResultRevisionRow.id == ResultRow.latest_revision_id)
+            .where(ResultRow.project_id == project_id)
+            .order_by(ResultRevisionRow.created_at.desc(), ResultRow.id)
+        )
+        return tuple(ApprovedResult(*row) for row in rows)
+
     def get(self, session: Session, result_id: UUID, *, lock: bool = False) -> ResultRecord | None:
         query = select(ResultRow).where(ResultRow.id == result_id).execution_options(populate_existing=True)
         if lock:
