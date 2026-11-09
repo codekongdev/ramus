@@ -88,6 +88,11 @@ test('sends a pinned conclusion to multiple conversations, forwards it, and expl
   await received(receiver).getByRole('button', { name: /경쟁사 분석/ }).click();
   const receivedDialog = receiver.getByRole('dialog', { name: revision1.title, exact: true });
   await expect(receivedDialog).toContainText(revision1.conclusion);
+  await expect(receivedDialog.getByText('출처 정보', { exact: true })).toHaveCount(0);
+  await expect(receivedDialog.getByRole('button', { name: '새 대화 만들기', exact: true })).toBeDisabled();
+  const receivedActions = receivedDialog.locator('.conclusion-view__actions button');
+  await expect(receivedActions).toHaveCount(2);
+  expect(await receivedActions.nth(0).getAttribute('class')).toBe(await receivedActions.nth(1).getAttribute('class'));
   await receivedDialog.getByRole('button', { name: '닫기', exact: true }).click();
   expect(receiverMutations).toBe(0);
   await received(receiver).getByRole('button', { name: /경쟁사 분석/ }).click();

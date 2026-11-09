@@ -60,6 +60,7 @@ async function mockResults(page: Page, connected = true) {
       if (path === '/api/conversations/c1') return json(parent);
       if (path === '/api/conversations/child1') return json(conversation);
       if (path.endsWith('/messages')) return json({ items: path.includes('child1') ? [message] : [], next_after_seq: null });
+      if (path.endsWith('/inputs')) return json({ items: [] });
       if (path === '/api/results/result1' && result) return json(result);
       if (path.startsWith('/api/result-revisions/')) {
         const revision = revisions.get(path.split('/').at(-1)!);
@@ -98,6 +99,15 @@ async function mockResults(page: Page, connected = true) {
   });
   return {
     summaries, saves,
+    addRevision,
+    seed(conclusion: string) {
+      task = { ...task, result_id: 'result1' };
+      result = { id: 'result1', project_id: 'p1', title: task.title,
+        source_conversation_id: 'child1', source_task_id: task.id,
+        latest_version: null, latest_revision_id: null, revisions: [], draft: null };
+      return addRevision(conclusion);
+    },
+    async publish(conclusion: string) { const revision = addRevision(conclusion); await emit(); return revision; },
     conflict() { conflictNextSave = true; },
     async complete(conclusion = '가입 혜택과 반품 예외를 함께 안내합니다.') {
       await expect.poll(() => result?.draft?.status).toBe('generating');
@@ -245,4 +255,101 @@ test('real server stores summary revisions and reopens the approved result', asy
   await queue.getByRole('button', { name: /경쟁사 분석/ }).click();
   await dialog.getByRole('tab', { name: '결과', exact: true }).click();
   await expect(dialog).toContainText('실제 저장 경로에서 승인한 결론');
+  const before = await (await page.request.get(`/api/projects/${identity.default_project_id}/conversations`)).json();
+  const writes: string[] = [];
+  page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/') && request.method() !== 'GET') writes.push(request.url()); });
+  await dialog.getByRole('button', { name: '결론 보기', exact: true }).click();
+  const reader = page.locator('dialog[open]');
+  await expect(reader).toContainText('실제 저장 경로에서 승인한 결론');
+  await expect(reader.getByText('출처 정보', { exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeVisible();
+  expect(writes).toEqual([]);
+  expect(await (await page.request.get(`/api/projects/${identity.default_project_id}/conversations`)).json()).toEqual(before);
+});
+
+test('conclusion reading preserves the parent draft, route and scroll and never writes', async ({ page }) => {
+  const fixture = await mockResults(page);
+  fixture.seed('고정된 결론\n본문만 읽습니다.');
+  await page.goto('/projects/p1/conversations/c1');
+  const parentDraft = page.getByRole('textbox', { name: '메시지', exact: true });
+  await parentDraft.fill('보내지 않은 부모 초안');
+  const parentMessages = page.locator('.conversation__messages');
+  await parentMessages.evaluate(node => { node.insertAdjacentHTML('beforeend', '<div style="height:3000px"></div>'); node.scrollTop = 350; });
+  const scroll = await parentMessages.evaluate(node => node.scrollTop);
+  const writes: string[] = [];
+  page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/') && request.method() !== 'GET') writes.push(request.url()); });
+  await page.locator('[data-slot="task-queue"]').getByRole('button', { name: /경쟁사 분석/ }).click();
+  const taskDialog = page.locator('dialog[open]');
+  await taskDialog.getByRole('tab', { name: '결과', exact: true }).click();
+  await expect(taskDialog.getByRole('region', { name: '결론 본문', exact: true })).toContainText('고정된 결론');
+  await taskDialog.getByRole('button', { name: '결론 보기', exact: true }).click();
+  const reader = page.locator('dialog[open]');
+  await expect(reader).toContainText('고정된 결론');
+  await expect(reader.getByRole('button', { name: '새 대화 만들기', exact: true })).toBeDisabled();
+  await expect(reader.getByRole('button', { name: '다른 대화에 보내기', exact: true })).toBeEnabled();
+  await expect(reader.getByRole('textbox')).toHaveCount(0);
+  await expect(reader.getByText('출처 정보', { exact: true })).toHaveCount(0);
+  await page.screenshot({ path: 'artifacts/b5-conclusion-desktop.png', fullPage: true });
+  const readerElement = await reader.elementHandle();
+  await reader.getByRole('button', { name: '다른 대화에 보내기', exact: true }).click();
+  await expect(reader.getByLabel('대화 검색', { exact: true })).toBeVisible();
+  await expect(page.locator('dialog[open]')).toHaveCount(1);
+  await reader.getByRole('button', { name: '결론으로 돌아가기', exact: true }).click();
+  expect(await reader.evaluate((node, original) => node === original, readerElement)).toBe(true);
+  await expect(reader.getByRole('button', { name: '다른 대화에 보내기', exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('dialog[open]').getByRole('tab', { name: '결과', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('dialog[open]').getByRole('button', { name: '결론 보기', exact: true })).toBeFocused();
+  await page.locator('dialog[open]').getByRole('button', { name: '닫기', exact: true }).click();
+  await expect(parentDraft).toHaveValue('보내지 않은 부모 초안');
+  expect(await parentMessages.evaluate(node => node.scrollTop)).toBe(scroll);
+  expect(new URL(page.url()).pathname).toBe('/projects/p1/conversations/c1');
+  expect(writes).toEqual([]);
+  expect(fixture.summaries).toEqual([]);
+  expect(fixture.saves).toEqual([]);
+});
+
+test('history and a received-conclusion reader stay on the chosen version across newer approvals', async ({ page }) => {
+  const fixture = await mockResults(page);
+  fixture.seed('첫 번째 버전의 결론');
+  fixture.addRevision('두 번째 버전의 결론');
+  const dialog = await openTask(page);
+  await dialog.getByRole('tab', { name: '결과', exact: true }).click();
+  await expect(dialog).toContainText('두 번째 버전의 결론');
+  await dialog.getByRole('button', { name: 'v1', exact: true }).click();
+  await expect(dialog).toContainText('첫 번째 버전의 결론');
+  await fixture.publish('세 번째 버전의 결론');
+  await expect(dialog.getByRole('button', { name: 'v3', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('region', { name: '결론 본문', exact: true })).toContainText('첫 번째 버전의 결론');
+  await dialog.getByRole('button', { name: '결론 보기', exact: true }).click();
+  await expect(page.locator('dialog[open]')).toContainText('첫 번째 버전의 결론');
+  await fixture.publish('네 번째 버전의 결론');
+  await expect(page.locator('dialog[open]')).toContainText('첫 번째 버전의 결론');
+  await page.locator('dialog[open]').getByRole('button', { name: '닫기', exact: true }).click();
+  expect(fixture.summaries).toEqual([]);
+  expect(fixture.saves).toEqual([]);
+});
+
+test('long conclusion stays readable on mobile with equal side-by-side actions', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  const fixture = await mockResults(page);
+  fixture.seed('긴결론'.repeat(800));
+  const dialog = await openTask(page);
+  await dialog.getByRole('tab', { name: '결과', exact: true }).click();
+  await dialog.getByRole('button', { name: '결론 보기', exact: true }).click();
+  const reader = page.locator('dialog[open]');
+  await expect(reader.getByRole('heading', { name: '결론', exact: true })).toBeVisible();
+  const actions = reader.locator('.conclusion-view__actions');
+  await actions.scrollIntoViewIfNeeded();
+  const buttons = await actions.locator('button').all();
+  const boxes = await Promise.all(buttons.map(button => button.boundingBox()));
+  expect(boxes[0]!.y).toBe(boxes[1]!.y);
+  expect(boxes[0]!.width).toBeCloseTo(boxes[1]!.width, 0);
+  expect(await reader.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+  const bounds = await reader.boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(375);
+  await page.screenshot({ path: 'artifacts/b5-conclusion-mobile.png' });
+  await reader.getByRole('button', { name: '닫기', exact: true }).click();
 });

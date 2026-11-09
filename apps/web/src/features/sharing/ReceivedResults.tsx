@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, type ReactNode, type Ref } from 'react';
+import type { components } from '../../api/schema';
 import { api, type AppApi } from '../../lib/api';
 import { useStore } from '../../lib/mvi';
 import { useProjectEventListener, useResyncListener } from '../../lib/realtime';
@@ -9,6 +10,8 @@ import { makeReceivedEffectHandler, makeRevisionEffectHandler } from './received
 import { initialReceivedState, initialRevisionState, receivedReducer, revisionReducer } from './receivedModel';
 import { SendConclusion, useSendConclusion } from './SendConclusion';
 import './sharing.css';
+
+type ResultRevision = components['schemas']['ResultRevision'];
 
 export function ReceivedResults({ conversationId, onOpen, client = api }: {
   readonly conversationId: string; readonly onOpen: (input: ConversationInput) => void; readonly client?: AppApi;
@@ -31,8 +34,12 @@ export function ReceivedResults({ conversationId, onOpen, client = api }: {
   </div>;
 }
 
-export function ReceivedResultDialog({ projectId, input, onClose, client = api }: {
+export function ReceivedResultDialog({ projectId, input, onClose, renderConclusion, client = api }: {
   readonly projectId: string; readonly input: ConversationInput; readonly onClose: () => void; readonly client?: AppApi;
+  readonly renderConclusion: (revision: ResultRevision, controls: {
+    readonly onSendToConversation: () => void;
+    readonly sendButtonRef: Ref<HTMLButtonElement>;
+  }) => ReactNode;
 }) {
   const handle = useMemo(() => makeRevisionEffectHandler(client), [client]);
   const [state, dispatch] = useStore(revisionReducer, () => initialRevisionState(input), handle);
@@ -44,12 +51,10 @@ export function ReceivedResultDialog({ projectId, input, onClose, client = api }
       {state.loading && <p role="status"><Spinner label={m.loadingRevision} /> {m.loadingRevision}</p>}
       {state.error && <div role="alert"><p>{state.error}</p><Button variant="outline" disabled={state.loading} onClick={() => dispatch({ type: 'refresh' })}>{m.retry}</Button></div>}
       {send.state.notice && <p role="status">{send.state.notice}</p>}
-      {revision && <>
-        <div className="sharing-actions"><h3>{m.savedConclusion}</h3><Badge>{m.version(revision.version)}</Badge></div>
-        <p className="sharing-conclusion">{revision.conclusion}</p>
-        <details><summary>{m.source}</summary><p>{m.sourceRange(revision.source.message_from_seq, revision.source.message_to_seq)}</p></details>
-        <div className="sharing-actions sharing-actions--end"><Button variant="outline" ref={send.returnFocusRef} onClick={() => send.dispatch({ type: 'open', target: { projectId, currentConversationId: input.conversation_id, revision } })}>{m.action}</Button></div>
-      </>}
+      {revision && renderConclusion(revision, {
+        onSendToConversation: () => send.dispatch({ type: 'open', target: { projectId, currentConversationId: input.conversation_id, revision } }),
+        sendButtonRef: send.returnFocusRef,
+      })}
     </div>}
   </Dialog>;
 }

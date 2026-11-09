@@ -327,6 +327,7 @@ class ResultUsageQuery(Protocol):
 | 모달 ID | `task:<taskId>`, `result:<resultRevisionId>`, `resources:<conversationId>`, `ai-connection` |
 | 작업 모달 | A의 `TaskModal`이 틀과 대화 탭을 그리고, 결과 탭과 헤더 액션은 아래 props로 받는다. 조립은 `app/pages/WorkspacePage`에서 하며 기능 폴더끼리 서로 import하지 않는다 |
 | 결론 보기 | B의 결론 보기 컴포넌트를 작업 모달 결과 탭과 받은 결론 모달(`result:<id>`)에서 함께 쓴다 |
+| B5 공개 컴포넌트 | `features/results`의 `ConclusionView({revision, ...actions})`, `ResultRevisionDialog({revisionId, onClose, ...actions})`. `ConclusionActions`의 `onCreateConversation`·`onSendToConversation`은 표시 중인 고정 `ResultRevision`을 받는다. 콜백 미주입 시 버튼 비활성. 앱이 B6의 보내기·받은 결론 모달과 공용 본문을 조립하며 B7 새 대화는 후속 연결한다 |
 | AI 연결 확인 | A의 `useAiConnection().ensure(): Promise<boolean>`. 키가 없으면 연결 모달을 열고 연결 결과를 돌려준다. 입력창(A)과 결과 정리 액션(B)이 AI 요청 직전에 호출한다 |
 | 실시간 | `src/lib/realtime`과 `src/lib/events.ts`를 쓰고, 연결이 열릴 때마다 각 기능이 자기 상태를 다시 조회한다 |
 

@@ -1,0 +1,27 @@
+# B5 결론 보기
+
+## 구현
+
+- `features/results/ConclusionView`를 작업 결과 탭과 `ResultRevisionDialog`, B6의 `ReceivedResultDialog`에서 함께 사용한다. 사용자 본문은 `conclusion` 하나이며, 모달은 결과 제목과 결론만 보여 준다. B4의 버전 이력·출처·편집 기능은 결과 탭에서 유지한다.
+- 작업 결과 탭의 ‘결론 보기’는 `result:<resultRevisionId>` 모달을 연다. 기존 작업 모달은 숨겨 보존하고 닫으면 원래 탭·초안·포커스로 돌아온다. 부모 대화와 URL은 유지한다.
+- 모달의 MVI reader는 `GET /api/result-revisions/{id}`만 호출한다. 응답을 스키마와 요청 ID로 검증하고, 대상 전환 시 이전 본문을 비우며, 늦은 응답과 닫힌 화면의 응답을 무시한다. 읽기 실패는 같은 버전으로 재시도한다.
+- 선택한 과거 버전은 실시간 갱신에도 유지한다. 새 버전 저장이나 명시적인 ‘최신 버전 확인’은 과거 조회 요청을 무효화한다. 과거 버전 조회 실패의 재시도도 같은 버전을 대상으로 한다.
+- ‘새 대화 만들기’와 ‘다른 대화에 보내기’는 같은 강조·너비로 나란히 배치한다. `ConclusionActions` 콜백은 클릭할 때 화면에 표시된 정확한 `ResultRevision`을 전달한다. 열기·닫기는 콜백을 실행하지 않는다.
+
+## 후속 연결 범위
+
+- 통합 시점의 main에 B6가 머지되어 우측 받은 결론 목록·검색·보내기 화면도 연결했다. 받은 결론은 `result:<id>`로 열며, 기존 B6 reader의 입력 스냅샷 검증과 전송 처리를 유지하고 `renderConclusion`으로 공용 본문을 주입한다.
+- B6의 보내기는 활성화되며 같은 모달 본문에서 대화 검색으로 전환하고 결론으로 돌아온다. `WorkspacePage`가 기능을 조립하므로 results와 sharing은 서로 import하지 않는다. B7 새 대화 생성은 콜백 연결 전까지 비활성화한다. 미구현 API를 호출하거나 성공으로 표시하지 않는다.
+- 현재 revision 조회 권한은 원본 프로젝트 참여자를 기준으로 한다. 원본 프로젝트에 접근할 수 없는 다른 프로젝트의 참여자가 스냅샷을 읽는 경로는 B7에서 별도 연결해야 한다.
+
+## 검증 (2026-11-09)
+
+- B6·B8의 최신 main 통합 후 `pnpm verify`: 9개 검사 PASS, FAIL/SKIP 없음. 프론트 49파일/470테스트·API 단위 622개·통합 262개와 OpenAPI/생성 타입 계약 검사 포함.
+- 결과 응답 파서를 `lib/api/result-contract.ts`로 옮겨 공유하며 기능 간 내부 import를 제거했다. 후속 웹 검사로 타입·단위·문구 검사를 확인했다.
+- `pnpm --filter @ramus/web build`: 프로덕션 빌드 통과.
+- `pnpm test:e2e tests/e2e/results.spec.ts`: 8개 통과. 실제 격리 DB의 저장·재열람, 열기·닫기의 변경 요청 부재, 부모 초안·스크롤·URL·포커스 유지, 실시간 갱신 중 과거 버전 유지, 375px 긴 본문·동일 너비 버튼 확인.
+- `pnpm test:e2e tests/e2e/results.spec.ts tests/e2e/sharing.spec.ts`: B6 통합 후 9개 통과. 실제 수신 목록에서 공용 결론 보기·닫기 무변경·전달·새 버전 명시적 재전송을 검증했다.
+- B8 통합 후 위 명령에 `tests/e2e/results-library.spec.ts`를 추가해 11개 통과. 결과물 목록과 프로젝트 전환·포커스 복귀도 확인했다.
+- 별도 로컬 Vite 서버를 지정한 `RAMUS_WEB_PORT=5185 pnpm test:e2e tests/e2e/task-ui.spec.ts`: 기존 작업 모달 3개 통과. 이 파일은 서버 fixture를 사용하지 않으므로 먼저 개발 서버를 실행해야 한다.
+- `git diff --check` 통과. 데스크톱·모바일 캡처는 로컬 `artifacts/b5-conclusion-{desktop,mobile}.png`에서 확인했다.
+- 기존 React `act` 및 Starlette deprecation 경고가 있다. 실제 모델 호출과 B7 새 대화 생성은 검증하지 않았다.
