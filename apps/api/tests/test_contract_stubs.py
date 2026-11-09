@@ -17,10 +17,13 @@ from ramus_api.settings import Settings
 KEY = {"Idempotency-Key": "test-key-1"}
 ID = str(uuid4())
 
-# P0-A4 login; covered by test_access_*_integration.py.
-IMPLEMENTED = frozenset(
-    {"requestEmailCode", "verifyEmailCode", "logout", "getMe", "listProjects", "listProjectParticipants"}
-)
+# Implemented behavior is covered by the access/conversation/realtime integration suites.
+IMPLEMENTED = frozenset({
+    "requestEmailCode", "verifyEmailCode", "logout", "getMe",
+    "listProjects", "listProjectParticipants",
+    "listConversations", "createConversation", "searchConversations", "getConversation",
+    "listMessages", "postMessage", "streamProjectEvents",
+})
 STUBS = tuple(e for e in CONTRACT_ENDPOINTS if e.operation_id not in IMPLEMENTED)
 
 BODIES: dict[str, dict] = {
@@ -121,15 +124,19 @@ def test_invalid_body_is_422_invalid_input(client: TestClient) -> None:
     assert response.json()["error"]["code"] == "INVALID_INPUT"
 
 
-def test_message_body_longer_than_the_limit_is_rejected(client: TestClient) -> None:
-    response = client.post(f"/api/conversations/{ID}/messages", json={"body": "a" * 20_001}, headers=KEY)
-    assert response.status_code == 422
+def test_message_body_longer_than_the_limit_is_rejected_by_schema() -> None:
+    from pydantic import ValidationError
+
+    from ramus_api.modules.conversations.presentation.dto import PostMessageRequest
+
+    with pytest.raises(ValidationError):
+        PostMessageRequest(body="a" * 20_001)
 
 
-def test_message_limit_is_capped_at_200(client: TestClient) -> None:
+def test_message_pagination_requires_login(client: TestClient) -> None:
     response = client.get(f"/api/conversations/{ID}/messages", params={"limit": 201})
-    assert response.status_code == 422
-    assert client.get(f"/api/conversations/{ID}/messages", params={"limit": 200}).status_code == 501
+    assert response.status_code == 401
+    assert client.get(f"/api/conversations/{ID}/messages", params={"limit": 200}).status_code == 401
 
 
 def test_share_with_no_targets_reaches_the_handler(client: TestClient) -> None:
