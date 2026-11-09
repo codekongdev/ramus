@@ -10,7 +10,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from ramus_api.container import AppContainer, ModuleRegistrar
-from ramus_api.modules import system
+from ramus_api.modules.access.presentation.routes import register as register_access
+from ramus_api.modules.conversations.presentation.routes import register as register_conversations
+from ramus_api.modules.execution.presentation.routes import register as register_execution
+from ramus_api.modules.projects.presentation.routes import register as register_projects
+from ramus_api.modules.realtime.presentation.routes import register as register_realtime
+from ramus_api.modules.resources.presentation.routes import register as register_resources
+from ramus_api.modules.results.presentation.routes import register as register_results
+from ramus_api.modules.sharing.presentation.routes import register as register_sharing
+from ramus_api.modules.system.presentation.routes import register as register_system
 from ramus_api.settings import Settings
 from ramus_api.shared.infrastructure import Database, SqlIdempotentExecutor
 from ramus_api.shared.presentation import ERROR_RESPONSES, install_error_handlers
@@ -19,7 +27,15 @@ API_TITLE = "Ramus API"
 API_VERSION = "0.1.0"
 
 MODULES: tuple[ModuleRegistrar, ...] = (
-    system.register,
+    register_system,
+    register_access,
+    register_projects,
+    register_conversations,
+    register_execution,
+    register_realtime,
+    register_resources,
+    register_results,
+    register_sharing,
 )
 
 
@@ -45,4 +61,3 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     for register in MODULES:
         register(app, container)
     return app
-
