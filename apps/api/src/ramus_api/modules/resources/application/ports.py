@@ -67,10 +67,41 @@ class NewResource:
     created_by: UUID
 
 
+@dataclass(frozen=True)
+class LockedHead:
+    """The resource row locked for update with its current latest revision."""
+
+    resource_id: UUID
+    project_id: UUID
+    kind: ResourceKind
+    latest_revision_id: UUID
+    latest_number: int
+    latest_hash: str
+
+
+@dataclass(frozen=True)
+class NewRevision:
+    revision_id: UUID
+    resource_id: UUID
+    number: int
+    base_revision_id: UUID
+    content: RevisionContent
+    content_hash: str
+    created_by: UUID
+
+
 class ResourceRepository(Protocol[TransactionT]):
     def add(self, session: TransactionT, resource: NewResource) -> None: ...
 
     def history(self, session: TransactionT, resource_id: UUID) -> ResourceHistory | None: ...
+
+    def revision(self, session: TransactionT, revision_id: UUID) -> RevisionRecord | None: ...
+
+    def lock_head(self, session: TransactionT, resource_id: UUID) -> LockedHead | None: ...
+
+    def add_revision(self, session: TransactionT, revision: NewRevision) -> None:
+        """Inserts the revision and makes it the resource's latest."""
+        ...
 
     def search(self, session: TransactionT, project_id: UUID, query: str) -> Sequence[ResourceRecord]:
         """Resources whose latest name or description contains ``query`` (case-insensitive), by name."""

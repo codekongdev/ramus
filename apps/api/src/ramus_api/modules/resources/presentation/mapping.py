@@ -11,6 +11,7 @@ from ramus_api.modules.resources.domain.rules import (
     FILE_TYPE_UNSUPPORTED,
     INVALID_INPUT,
     NOT_FOUND,
+    VERSION_CONFLICT,
     ResourceRuleError,
 )
 from ramus_api.modules.resources.presentation.dto import (
@@ -28,9 +29,14 @@ from ramus_api.shared.domain import BusinessError
 from ramus_api.shared.presentation.error_messages import message_for, register_error_messages
 from ramus_api.shared.presentation.errors import HTTP_ERRORS, INVALID_INPUT_MESSAGE
 
-register_error_messages({FILE_TYPE_UNSUPPORTED: ".md 또는 .txt 형식의 UTF-8 텍스트 파일만 올릴 수 있습니다."})
+register_error_messages(
+    {
+        FILE_TYPE_UNSUPPORTED: ".md 또는 .txt 형식의 UTF-8 텍스트 파일만 올릴 수 있습니다.",
+        VERSION_CONFLICT: "다른 사람이 먼저 새 버전을 저장했습니다. 최신 내용을 확인한 뒤 다시 저장해 주세요.",
+    }
+)
 
-_STATUS = {INVALID_INPUT: 422, FILE_TYPE_UNSUPPORTED: 422, NOT_FOUND: 404}
+_STATUS = {INVALID_INPUT: 422, FILE_TYPE_UNSUPPORTED: 422, NOT_FOUND: 404, VERSION_CONFLICT: 409}
 
 
 def to_business_error(error: ResourceRuleError) -> BusinessError:
@@ -47,7 +53,7 @@ def to_business_error(error: ResourceRuleError) -> BusinessError:
     )
 
 
-def _revision(record: RevisionRecord) -> ResourceRevision:
+def revision_dto(record: RevisionRecord) -> ResourceRevision:
     content = record.content
     return ResourceRevision(
         id=record.id,
@@ -75,7 +81,7 @@ def resource_detail(history: ResourceHistory, selected: RevisionRecord | None = 
             )
             for e in history.revisions
         ],
-        revision=_revision(selected or resource.latest),
+        revision=revision_dto(selected or resource.latest),
     )
 
 

@@ -1,7 +1,7 @@
 """Resource endpoints: shared skills/materials, versions, and what a conversation applies.
 
 B1: list/create resources and get/replace the versions a conversation pins.
-B2 (detail/history, new revision) is still a stub.
+B2: resource detail/history and saving a new revision.
 """
 
 from collections.abc import Callable
@@ -14,7 +14,12 @@ from sqlalchemy.orm import Session
 from ramus_api.container import AppContainer
 from ramus_api.modules.access.presentation.current_account import AuthenticatedAccount, require_account
 from ramus_api.modules.conversations.composition import CommittedEvents
-from ramus_api.modules.resources.application.use_cases import Outcome, ResourceDraft, ResourceUseCases
+from ramus_api.modules.resources.application.use_cases import (
+    Outcome,
+    ResourceDraft,
+    ResourceUseCases,
+    RevisionDraft,
+)
 from ramus_api.modules.resources.domain.models import ResourceKind
 from ramus_api.modules.resources.domain.rules import ResourceRuleError
 from ramus_api.modules.resources.infrastructure.lookups import (
@@ -34,11 +39,11 @@ from ramus_api.modules.resources.presentation.dto import (
 from ramus_api.modules.resources.presentation.mapping import (
     applied_list,
     resource_detail,
+    revision_dto,
     summary_list,
     to_business_error,
 )
 from ramus_api.shared.domain.primitives import new_id, utc_now
-from ramus_api.shared.presentation.error_messages import not_implemented
 from ramus_api.shared.presentation.idempotency import IdempotencyKey
 
 SearchQuery = Annotated[str, Query(max_length=100, description="Matches name and description.")]
@@ -126,8 +131,9 @@ def register(app: FastAPI, container: AppContainer) -> None:
         )
 
     @router.get("/resources/{resource_id}", response_model=ResourceDetail, operation_id="getResource")
-    def get_resource(resource_id: UUID, revision_id: UUID | None = None):
-        raise not_implemented()  # B2
+    def get_resource(resource_id: UUID, account: CurrentAccount, revision_id: UUID | None = None):
+        history, selected = read(lambda s: use_cases.detail(s, account.account_id, resource_id, revision_id))
+        return resource_detail(history, selected)
 
     @router.post(
         "/resources/{resource_id}/revisions",
@@ -135,9 +141,29 @@ def register(app: FastAPI, container: AppContainer) -> None:
         operation_id="createResourceRevision",
     )
     def create_resource_revision(
-        resource_id: UUID, body: CreateResourceRevisionRequest, idempotency_key: IdempotencyKey
+        resource_id: UUID,
+        body: CreateResourceRevisionRequest,
+        idempotency_key: IdempotencyKey,
+        account: CurrentAccount,
     ):
-        raise not_implemented()  # B2
+        draft = RevisionDraft(
+            body.base_revision_id,
+            body.name,
+            body.description,
+            body.instructions,
+            body.content,
+            body.file_name,
+        )
+        return change(
+            account,
+            f"resources.revision:{resource_id}",
+            idempotency_key,
+            body.model_dump(mode="json"),
+            lambda s: use_cases.save_revision(s, account.account_id, resource_id, draft),
+            lambda saved: CreateResourceRevisionResponse(
+                revision=revision_dto(saved.revision), created=saved.created
+            ),
+        )
 
     @router.get(
         "/conversations/{conversation_id}/resources",
