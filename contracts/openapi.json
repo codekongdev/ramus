@@ -340,7 +340,7 @@
             "type": "string"
           },
           "latest_version": {
-            "description": "Current latest version of the source result.",
+            "description": "Latest source version visible to this account; pinned version when source access is restricted.",
             "title": "Latest Version",
             "type": "integer"
           },
@@ -384,6 +384,84 @@
           "created_at"
         ],
         "title": "ConversationInput",
+        "type": "object"
+      },
+      "ConversationInputDetail": {
+        "properties": {
+          "conclusion": {
+            "title": "Conclusion",
+            "type": "string"
+          },
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "latest_version": {
+            "description": "Latest source version visible to this account; pinned version when source access is restricted.",
+            "title": "Latest Version",
+            "type": "integer"
+          },
+          "origin": {
+            "enum": [
+              "share",
+              "new_conversation"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "result_id": {
+            "format": "uuid",
+            "title": "Result Id",
+            "type": "string"
+          },
+          "result_revision_id": {
+            "format": "uuid",
+            "title": "Result Revision Id",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ResultRevisionSource"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "conversation_id",
+          "result_id",
+          "result_revision_id",
+          "version",
+          "title",
+          "latest_version",
+          "origin",
+          "created_by",
+          "created_at",
+          "conclusion",
+          "source"
+        ],
+        "title": "ConversationInputDetail",
         "type": "object"
       },
       "ConversationInputList": {
@@ -2348,6 +2426,69 @@
           }
         },
         "summary": "List Conversation Inputs",
+        "tags": [
+          "sharing"
+        ]
+      }
+    },
+    "/api/conversations/{conversation_id}/inputs/{input_id}": {
+      "get": {
+        "operationId": "getConversationInput",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "input_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Input Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationInputDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Client error"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Server error"
+          }
+        },
+        "summary": "Get Conversation Input",
         "tags": [
           "sharing"
         ]

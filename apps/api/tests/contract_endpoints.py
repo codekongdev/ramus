@@ -75,6 +75,7 @@ CONTRACT_ENDPOINTS: tuple[Endpoint, ...] = (
     Endpoint("get", "/api/projects/{project_id}/results", "results", "listProjectResults"),
     Endpoint("post", "/api/result-revisions/{result_revision_id}/shares", "sharing", "shareResultRevision"),
     Endpoint("get", "/api/conversations/{conversation_id}/inputs", "sharing", "listConversationInputs"),
+    Endpoint("get", "/api/conversations/{conversation_id}/inputs/{input_id}", "sharing", "getConversationInput"),
     Endpoint(
         "post",
         "/api/projects/{project_id}/conversations/from-result",
