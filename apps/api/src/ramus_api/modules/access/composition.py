@@ -5,10 +5,13 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from ramus_api.container import AppContainer
+from ramus_api.modules.access.application.ai_connection import AiConnections
 from ramus_api.modules.access.application.login import RequestEmailCode, VerifyEmailCode
 from ramus_api.modules.access.application.ports import SharedProjectProvider
 from ramus_api.modules.access.application.rate_limits import AuthRateLimiter
 from ramus_api.modules.access.application.sessions import Authenticator, ProfileReader, SessionIssuer
+from ramus_api.modules.access.infrastructure.ai_connections import SqlAiConnectionStore
+from ramus_api.modules.access.infrastructure.credential_cipher import AesCredentialCipher
 from ramus_api.modules.access.infrastructure.rate_limits import SqlAttemptStore
 from ramus_api.modules.access.infrastructure.stores import SqlAccountStore, SqlEmailCodeStore, SqlSessionStore
 from ramus_api.modules.access.infrastructure.system import SystemClock, SystemSecretSource
@@ -22,6 +25,19 @@ class AccessServices:
     verify_email_code: VerifyEmailCode[Session]
     authenticator: SessionAuthenticator
     profiles: ProfileReader[Session]
+    ai_connections: AiConnections[Session]
+
+
+def build_ai_connections(container: AppContainer) -> AiConnections[Session]:
+    """Public builder providing both execution AiConnectionQuery and access CredentialProvider."""
+    return AiConnections(
+        container.database.transaction,
+        container.idempotency,
+        SqlAiConnectionStore(),
+        container.ai_key_validator,
+        AesCredentialCipher(container.settings.secret_key),
+        SystemClock(),
+    )
 
 
 def build_authenticator(database: Database) -> Authenticator[Session]:
@@ -47,4 +63,5 @@ def build_access_services(
         ),
         authenticator=container.authenticator,
         profiles=profiles,
+        ai_connections=build_ai_connections(container),
     )

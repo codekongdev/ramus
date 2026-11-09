@@ -1,6 +1,17 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useId, useRef, type ReactNode } from 'react';
 import { ButtonV2 } from '@ramus/design-system';
 import { UI_CONTRAST, UI_THEME } from './theme';
+
+const DialogVisibilityContext = createContext(true);
+
+/** Hides an interrupted modal without unmounting its form or cancelling its effect store. */
+export function DialogVisibilityProvider({ visible, children }: {
+  readonly visible: boolean;
+  readonly children: ReactNode;
+}) {
+  const parentVisible = useContext(DialogVisibilityContext);
+  return <DialogVisibilityContext.Provider value={parentVisible && visible}>{children}</DialogVisibilityContext.Provider>;
+}
 
 export type DialogProps = {
   readonly open: boolean;
@@ -18,16 +29,18 @@ export type DialogProps = {
  * `onOpenChange(false)`, so the parent stays the source of truth.
  */
 export function Dialog({ open, onOpenChange, title, headerActions, children, footer, className }: DialogProps) {
+  const visible = useContext(DialogVisibilityContext);
+  const effectiveOpen = open && visible;
   const titleId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const latest = useRef({ open, onOpenChange });
+  const latest = useRef({ open: effectiveOpen, onOpenChange });
   useEffect(() => {
-    latest.current = { open, onOpenChange };
+    latest.current = { open: effectiveOpen, onOpenChange };
   });
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (!dialog || !open) return;
+    if (!dialog || !effectiveOpen) return;
     const active = dialog.ownerDocument.activeElement;
     const opener = active instanceof HTMLElement ? active : null;
     if (!dialog.open) dialog.showModal();
@@ -36,7 +49,7 @@ export function Dialog({ open, onOpenChange, title, headerActions, children, foo
       if (dialog.open) dialog.close();
       if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
-  }, [open]);
+  }, [effectiveOpen]);
 
   const requestClose = () => {
     if (latest.current.open) latest.current.onOpenChange(false);
@@ -49,13 +62,14 @@ export function Dialog({ open, onOpenChange, title, headerActions, children, foo
       data-contrast={UI_CONTRAST}
       className={['ramus', 'h-dialog', 'ui-dialog', className].filter(Boolean).join(' ')}
       aria-labelledby={titleId}
+      hidden={!visible}
       onCancel={(event) => {
         event.preventDefault();
         requestClose();
       }}
       onClose={(event) => {
         // Ignore the queued close event of a dialog that was reopened or closed by the parent.
-        if (!event.currentTarget.open) requestClose();
+        if (!event.currentTarget.open && !event.currentTarget.hidden) requestClose();
       }}
     >
       {open && (

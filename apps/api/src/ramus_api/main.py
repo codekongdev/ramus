@@ -14,9 +14,10 @@ from fastapi import FastAPI
 from sqlalchemy.orm import Session
 
 from ramus_api.container import AppContainer, ModuleRegistrar
-from ramus_api.modules.access.application.ports import Mailer
+from ramus_api.modules.access.application.ports import AiKeyValidator, Mailer
 from ramus_api.modules.access.composition import build_authenticator
 from ramus_api.modules.access.infrastructure.mailer import LoggingMailer
+from ramus_api.modules.access.infrastructure.openai_key_validator import OpenAiKeyValidator
 from ramus_api.modules.access.infrastructure.project_access import SqlAiConnectionQuery, SqlProjectAccess
 from ramus_api.modules.access.infrastructure.stores import SqlAccountStore
 from ramus_api.modules.access.presentation.routes import register as register_access
@@ -73,7 +74,9 @@ MODULES: tuple[ModuleRegistrar, ...] = (
 )
 
 
-def build_container(settings: Settings, mailer: Mailer | None = None) -> AppContainer:
+def build_container(
+    settings: Settings, mailer: Mailer | None = None, ai_key_validator: AiKeyValidator | None = None
+) -> AppContainer:
     """``mailer`` defaults to the development ``LoggingMailer``, which prints codes to the server log."""
     database = Database(settings.database_url)
     events = InProcessEventBroker()
@@ -93,12 +96,18 @@ def build_container(settings: Settings, mailer: Mailer | None = None) -> AppCont
         event_hooks=hooks,
         run_requester=requester,
         run_reader=SqlRunReader(),
+        ai_key_validator=ai_key_validator if ai_key_validator is not None else OpenAiKeyValidator(settings.openai_model),
     )
 
 
-def create_app(settings: Settings | None = None, *, mailer: Mailer | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    *,
+    mailer: Mailer | None = None,
+    ai_key_validator: AiKeyValidator | None = None,
+) -> FastAPI:
     """Builds the app without connecting to the database; connections open on first use."""
-    container = build_container(settings or Settings(), mailer)
+    container = build_container(settings or Settings(), mailer, ai_key_validator)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:

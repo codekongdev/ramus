@@ -24,6 +24,8 @@ uv sync --project apps/api --locked
 환경변수는 `.env.example`을 참고해 로컬 `.env`에 설정한다.
 실제 키와 로컬 데이터는 커밋하지 않는다.
 
+개인 AI 키 연결에는 `RAMUS_SECRET_KEY`가 필요하다. `python3 -c 'import secrets; print(secrets.token_urlsafe(32))'`로 생성한 값을 로컬 `.env`에 설정한다. 서버는 이 값으로 계정별 키를 암호화한다. 값을 바꾸거나 잃으면 기존 키를 복호화할 수 없으므로 계정에서 다시 연결해야 한다. 연결 검증은 `OPENAI_MODEL`에 설정한 모델에 최대 16 출력 토큰의 짧은 요청을 보내므로 소액의 API 사용료가 발생할 수 있다. 테스트는 검증 어댑터를 주입하므로 실제 API를 호출하지 않는다.
+
 ## 워크트리별 설정
 
 워크트리마다 루트 `.env`에서 DB 이름과 두 포트를 다르게 지정한다. Postgres 서버(`pnpm db:up`)는 함께 쓴다.

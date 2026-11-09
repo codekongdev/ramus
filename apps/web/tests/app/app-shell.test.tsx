@@ -37,6 +37,7 @@ describe('AppShell (WF-01 layout)', () => {
     expect(slots.map((el) => el.getAttribute('data-slot'))).toEqual([
       'project',
       'participants',
+      'account-actions',
       'conversation-tree',
       'workspace-menu',
       'conversation',

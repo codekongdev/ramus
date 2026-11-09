@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { task as initialTask, conversation, parent, message as initialMessage, me, createdAt } from '../../apps/web/tests/fixtures/tasks';
 
-async function fixture(page: Page, accountId = 'u1') {
+async function fixture(page: Page, accountId = 'u1', connected = true) {
   let task = { ...initialTask };
   let messages = [{ ...initialMessage }];
   const mutations: string[] = [];
@@ -22,7 +22,8 @@ async function fixture(page: Page, accountId = 'u1') {
     const path = url.pathname;
     const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
     if (request.method() === 'GET') {
-      if (path === '/api/me') return json({ ...me, account: { ...me.account, id: accountId } });
+      if (path === '/api/me') return json({ ...me, account: { ...me.account, id: accountId }, ai_connection: { status: connected ? 'connected' : 'none' } });
+      if (path === '/api/me/ai-connection') return json({ status: connected ? 'connected' : 'none' });
       if (path === '/api/projects') return json({ items: [{ id: 'p1', name: '공동 샘플', is_shared_sample: true }] });
       if (path === '/api/projects/p1/participants') return json({ items: [me.account] });
       if (path === '/api/projects/p1/conversations') return json({ items: [parent, conversation] });
@@ -33,6 +34,10 @@ async function fixture(page: Page, accountId = 'u1') {
     } else {
       mutations.push(path);
       expect(request.headers()['idempotency-key']).toBeTruthy();
+      if (path === '/api/me/ai-connection') {
+        connected = true;
+        return json({ status: 'connected' });
+      }
       if (path === '/api/conversations/child1/messages') {
         const body = request.postDataJSON().body;
         const added = { ...initialMessage, id: `m${messages.length + 1}`, seq: messages.length + 1,
@@ -91,6 +96,35 @@ test('queue and tree open one task modal without navigating; updates and close d
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   await expect(page).toHaveURL(/\/projects\/p1\/conversations\/c1$/);
+});
+
+test('a keyless task request retains its draft on cancel and resumes exactly once after connection', async ({ page }) => {
+  const { mutations, update } = await fixture(page, 'u1', false);
+  await page.goto('/projects/p1/conversations/c1');
+  await expect(page.locator('[data-slot="task-queue"]')).toContainText('경쟁사 분석');
+  await update('ready');
+  await page.locator('[data-slot="task-queue"]').getByRole('button', { name: /경쟁사 분석/ }).click();
+  const taskDialog = page.getByRole('dialog', { name: '경쟁사 분석', exact: true });
+  const draft = taskDialog.getByLabel('작업 메시지', { exact: true });
+  await draft.fill('@AI 원래 작업의 예외 사례를 보완해 주세요.');
+  await taskDialog.getByRole('button', { name: '전송', exact: true }).click();
+  const connectionDialog = page.getByRole('dialog', { name: 'AI를 사용하려면 연결해 주세요', exact: true });
+  await expect(connectionDialog).toBeVisible();
+  await expect(page.locator('dialog[open]')).toHaveCount(1);
+  await connectionDialog.getByRole('button', { name: '취소', exact: true }).click();
+  await expect(taskDialog).toBeVisible();
+  await expect(draft).toHaveValue('@AI 원래 작업의 예외 사례를 보완해 주세요.');
+  expect(mutations).toEqual([]);
+  await taskDialog.getByRole('button', { name: '전송', exact: true }).click();
+  await expect(connectionDialog).toBeVisible();
+  await connectionDialog.getByLabel('OpenAI API 키', { exact: true }).fill('valid-test-task-request');
+  await connectionDialog.getByRole('button', { name: '연결하고 요청 실행', exact: true }).click();
+  await expect(taskDialog).toBeVisible();
+  await expect(taskDialog).toContainText('@AI 원래 작업의 예외 사례를 보완해 주세요.');
+  await expect(draft).toHaveValue('');
+  expect(mutations).toEqual(['/api/me/ai-connection', '/api/conversations/child1/messages']);
+  await expect(page).toHaveURL(/\/projects\/p1\/conversations\/c1$/);
+  await expect(page.locator('dialog[open]')).toHaveCount(1);
 });
 
 test('requester can stop and retry; another member can read and discuss without controlling the run', async ({ browser }) => {

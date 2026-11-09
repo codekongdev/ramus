@@ -38,4 +38,42 @@ describe('modalHostReducer', () => {
     expect(() => modalHostReducer(prev, { type: 'open', entry: entry('b') })).not.toThrow();
     expect(prev.current.id).toBe('a');
   });
+
+  it('preserves an interrupted entry and resumes it only on a matching close', () => {
+    const task = entry('task:1');
+    const ai = entry('ai-connection');
+    const interrupted = modalHostReducer({ current: task }, { type: 'open', entry: ai, preserveCurrent: true });
+    expect(interrupted).toEqual({ current: ai, suspended: task });
+    expect(modalHostReducer(interrupted, { type: 'close', id: task.id })).toBe(interrupted);
+    expect(modalHostReducer(interrupted, { type: 'close', id: ai.id })).toEqual({ current: task });
+  });
+
+  it('dismisses both entries on a close without an id, such as route navigation', () => {
+    const state = { current: entry('ai-connection'), suspended: entry('task:1') };
+    expect(modalHostReducer(state, { type: 'close' })).toEqual({ current: null });
+  });
+
+  it('discards the suspended entry on an ordinary replacement', () => {
+    const replacement = entry('task:2');
+    expect(modalHostReducer({ current: entry('ai-connection'), suspended: entry('task:1') }, {
+      type: 'open', entry: replacement,
+    })).toEqual({ current: replacement });
+  });
+
+  it('keeps the original entry when re-opening or replacing an interruption', () => {
+    const task = entry('task:1');
+    const ai = entry('ai-connection');
+    const state = { current: ai, suspended: task };
+    expect(modalHostReducer(state, { type: 'open', entry: ai, preserveCurrent: true }))
+      .toEqual(state);
+    const alternate = entry('another-interruption');
+    expect(modalHostReducer(state, { type: 'open', entry: alternate, preserveCurrent: true }))
+      .toEqual({ current: alternate, suspended: task });
+  });
+
+  it('does not create a suspended entry when there was no current modal', () => {
+    const ai = entry('ai-connection');
+    expect(modalHostReducer(initialModalHostState, { type: 'open', entry: ai, preserveCurrent: true }))
+      .toEqual({ current: ai });
+  });
 });

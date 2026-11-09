@@ -19,7 +19,7 @@ ID = str(uuid4())
 
 # Implemented behavior is covered by the access/conversation/realtime integration suites.
 IMPLEMENTED = frozenset({
-    "requestEmailCode", "verifyEmailCode", "logout", "getMe",
+    "requestEmailCode", "verifyEmailCode", "logout", "getMe", "getAiConnection", "connectAi", "disconnectAi",
     "listProjects", "listProjectParticipants",
     "listConversations", "createConversation", "searchConversations", "getConversation",
     "listMessages", "postMessage", "streamProjectEvents",
