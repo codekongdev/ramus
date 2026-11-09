@@ -40,6 +40,6 @@ export type {
 } from '@ramus/design-system';
 
 export { UiProvider } from './UiProvider';
-export { Dialog } from './Dialog';
+export { Dialog, DialogVisibilityProvider } from './Dialog';
 export type { DialogProps } from './Dialog';
 export { TaskStatusBadge } from './TaskStatusBadge';

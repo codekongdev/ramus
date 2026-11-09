@@ -41,3 +41,5 @@ class Settings(BaseSettings):
     )
     # Adds ``Secure`` to the session cookie. Turn on wherever the app is served over HTTPS.
     cookie_secure: bool = Field(default=False, validation_alias="RAMUS_COOKIE_SECURE")
+    secret_key: SecretStr | None = Field(default=None, validation_alias="RAMUS_SECRET_KEY")
+    openai_model: str = Field(default="gpt-6-luna", min_length=1, validation_alias="OPENAI_MODEL")

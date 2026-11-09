@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { AuthProvider, useAuth } from '../features/auth/AuthProvider';
 import { authMessages as m } from '../features/auth/messages';
+import { AiConnectionButton, AiConnectionModalHost, AiConnectionProvider, useAiConnection } from '../features/ai-connection';
 import { ProjectEventsProvider } from '../lib/realtime';
 import { Button } from '../ui';
 import './app.css';
@@ -27,7 +28,7 @@ function AppRoutes() {
   if (auth.status === 'anonymous') return <LoginPage />;
   if (auth.me) {
     const projectId = route.name === 'workspace' && route.projectId ? route.projectId : auth.me.default_project_id;
-    return <AuthenticatedWorkspace key={projectId} projectId={projectId} conversationId={route.name === 'workspace' ? route.conversationId : undefined} />;
+    return <AuthenticatedWorkspace key={`${auth.me.account.id}:${projectId}`} projectId={projectId} conversationId={route.name === 'workspace' ? route.conversationId : undefined} />;
   }
   return null;
 }
@@ -37,6 +38,16 @@ function AuthenticatedWorkspace({ projectId, conversationId }: { readonly projec
   const expireSession = useCallback(() => dispatch({ type: 'sessionExpired' }), [dispatch]);
   // The modal host is inside the same project event connection as the parent workspace.
   return <ProjectEventsProvider projectId={projectId} onUnauthorized={expireSession}>
-    <ModalHostProvider><WorkspacePage projectId={projectId} conversationId={conversationId} /></ModalHostProvider>
+    <AiConnectionProvider>
+      <ModalHostProvider>
+        <AiConnectionModalHost />
+        <ConnectedWorkspace projectId={projectId} conversationId={conversationId} />
+      </ModalHostProvider>
+    </AiConnectionProvider>
   </ProjectEventsProvider>;
+}
+
+function ConnectedWorkspace(props: { readonly projectId: string; readonly conversationId?: string }) {
+  const { ensure } = useAiConnection();
+  return <WorkspacePage {...props} ensureAiConnection={ensure} slots={{ accountActions: <AiConnectionButton /> }} />;
 }

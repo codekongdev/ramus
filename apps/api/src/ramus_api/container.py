@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from fastapi import FastAPI
 from sqlalchemy.orm import Session
 
-from ramus_api.modules.access.application.ports import ProjectAccess
+from ramus_api.modules.access.application.ports import AiKeyValidator, ProjectAccess
 from ramus_api.modules.conversations.application.ports import RunReader
 from ramus_api.modules.execution.application.ports import RunRequester
 from ramus_api.modules.execution.application.relay import EventRelay
@@ -32,6 +32,7 @@ class AppContainer:
     event_hooks: TransactionHooks[Session]
     run_requester: RunRequester[Session]
     run_reader: RunReader[Session]
+    ai_key_validator: AiKeyValidator
 
 
 ModuleRegistrar = Callable[[FastAPI, AppContainer], None]

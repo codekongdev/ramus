@@ -10,6 +10,7 @@ from typing import Protocol, TypeVar
 from uuid import UUID
 
 from ramus_api.modules.access.domain.codes import EmailCodeState
+from ramus_api.modules.access.domain.credentials import StoredCredential
 from ramus_api.modules.access.domain.models import (
     AccountProfile,
     AIConnectionStatus,
@@ -34,6 +35,29 @@ class ProjectAccess(Protocol[TransactionT]):
     def require_member(self, transaction: TransactionT, project_id: UUID, account_id: UUID) -> None: ...
 
     def display_names(self, transaction: TransactionT, account_ids: set[UUID]) -> dict[UUID, str]: ...
+
+
+class AiKeyValidator(Protocol):
+    async def validate(self, api_key: str) -> None:
+        """Checks model access; failures must not retain or expose the supplied key."""
+
+
+class CredentialCipher(Protocol):
+    def encrypt(self, account_id: UUID, api_key: str) -> str: ...
+
+    def decrypt(self, account_id: UUID, ciphertext: str) -> str: ...
+
+    def fingerprint(self, api_key: str) -> str: ...
+
+
+class AiConnectionStore(Protocol[TransactionT]):
+    def get(self, transaction: TransactionT, account_id: UUID) -> StoredCredential | None: ...
+
+    def save(self, transaction: TransactionT, account_id: UUID, credential: StoredCredential) -> None: ...
+
+    def delete(self, transaction: TransactionT, account_id: UUID) -> None: ...
+
+    def is_connected(self, transaction: TransactionT, account_id: UUID) -> bool: ...
 
 
 class Clock(Protocol):

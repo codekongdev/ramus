@@ -2,7 +2,7 @@
 import { createElement, act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Dialog } from '../../src/ui';
+import { Dialog, DialogVisibilityProvider } from '../../src/ui';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -119,5 +119,31 @@ describe('Dialog', () => {
     act(() => inside.click());
     expect(document.activeElement).toBe(toggle);
     opener.remove();
+  });
+
+  it('closes native visibility while preserving requested content and ignoring the queued close event', () => {
+    const onOpenChange = vi.fn();
+    const renderVisible = (visible: boolean) => act(() => root.render(
+      createElement(DialogVisibilityProvider, { visible, children:
+        createElement(Dialog, { open: true, onOpenChange, title: 'Task', children: createElement('textarea', { defaultValue: 'draft' }) }),
+      }),
+    ));
+    renderVisible(true);
+    const dialog = dialogEl();
+    const textarea = container.querySelector('textarea')!;
+    textarea.value = 'unsaved draft';
+    renderVisible(false);
+    expect(dialog.open).toBe(false);
+    expect(dialog.hidden).toBe(true);
+    expect(container.querySelector('textarea')).toBe(textarea);
+    expect(textarea.value).toBe('unsaved draft');
+    act(() => dialog.dispatchEvent(new Event('close')));
+    expect(onOpenChange).not.toHaveBeenCalled();
+    renderVisible(true);
+    expect(dialogEl()).toBe(dialog);
+    expect(dialog.open).toBe(true);
+    expect(dialog.hidden).toBe(false);
+    expect(container.querySelector('textarea')).toBe(textarea);
+    expect(textarea.value).toBe('unsaved draft');
   });
 });

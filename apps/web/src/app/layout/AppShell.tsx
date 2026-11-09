@@ -10,6 +10,8 @@ export type AppShellSlots = {
   readonly project?: ReactNode;
   /** Top bar, right: participants (A1). */
   readonly participants?: ReactNode;
+  /** Top bar, right: account AI connection settings (A3). */
+  readonly accountActions?: ReactNode;
   /** Left column, top: conversation tree (A2). */
   readonly conversationTree?: ReactNode;
   /** Left column, below the tree: 결과물·스킬·자료·프로젝트 구조 menu (B8·B1·A9). */
@@ -28,6 +30,7 @@ export function AppShell(slots: AppShellSlots) {
       <header className="app-shell__top" aria-label="프로젝트">
         <div className="app-shell__slot" data-slot="project">{slots.project}</div>
         <div className="app-shell__slot" data-slot="participants">{slots.participants}</div>
+        <div className="app-shell__slot" data-slot="account-actions">{slots.accountActions}</div>
       </header>
       <nav className="app-shell__left" aria-label="대화 목록">
         <div className="app-shell__slot app-shell__scroll" data-slot="conversation-tree">

@@ -1,10 +1,8 @@
-"""Access endpoints: email-code login, session, and the account's AI connection.
+"""Access endpoints: email-code login, session, and the account's private AI connection."""
 
-Login, logout, and ``GET /api/me`` are implemented (P0-A4). The AI connection endpoints stay stubs
-until task A3.
-"""
+from typing import Annotated
 
-from fastapi import APIRouter, FastAPI, Request, Response
+from fastapi import APIRouter, Depends, FastAPI, Request, Response
 from sqlalchemy.orm import Session
 
 from ramus_api.container import AppContainer
@@ -16,6 +14,7 @@ from ramus_api.modules.access.presentation.cookies import (
     read_session_token,
     set_session_cookie,
 )
+from ramus_api.modules.access.presentation.current_account import AuthenticatedAccount, require_account
 from ramus_api.modules.access.presentation.dto import (
     Account,
     AiConnectionConnected,
@@ -28,7 +27,6 @@ from ramus_api.modules.access.presentation.dto import (
     VerifyEmailCodeRequest,
 )
 from ramus_api.modules.access.presentation.errors import access_errors, unauthorized
-from ramus_api.shared.presentation.error_messages import not_implemented
 from ramus_api.shared.presentation.idempotency import IdempotencyKey
 from ramus_api.shared.presentation.schemas import EmptyRequest, EmptyResponse
 
@@ -48,7 +46,7 @@ def register(
     services = build_access_services(container, shared_project)
     router = APIRouter(prefix="/api", tags=["access"])
     _add_login_routes(router, container, services)
-    _add_ai_connection_stubs(router)
+    _add_ai_connection_routes(router, container, services)
     app.include_router(router)
 
 
@@ -99,15 +97,20 @@ def _add_login_routes(router: APIRouter, container: AppContainer, services: Acce
         return to_me(profile)
 
 
-def _add_ai_connection_stubs(router: APIRouter) -> None:
+def _add_ai_connection_routes(router: APIRouter, container: AppContainer, services: AccessServices) -> None:
+    CurrentAccount = Annotated[AuthenticatedAccount, Depends(require_account(container))]
+
     @router.get("/me/ai-connection", response_model=AiConnectionState, operation_id="getAiConnection")
-    def get_ai_connection():
-        raise not_implemented()
+    def get_ai_connection(account: CurrentAccount):
+        return AiConnectionState(status=services.ai_connections.status(account.account_id).value)
 
     @router.put("/me/ai-connection", response_model=AiConnectionConnected, operation_id="connectAi")
-    def connect_ai(body: ConnectAiRequest, idempotency_key: IdempotencyKey):
-        raise not_implemented()
+    async def connect_ai(body: ConnectAiRequest, idempotency_key: IdempotencyKey, account: CurrentAccount):
+        with access_errors():
+            await services.ai_connections.connect(account.account_id, body.api_key, idempotency_key)
+        return AiConnectionConnected(status="connected")
 
     @router.delete("/me/ai-connection", response_model=AiConnectionDisconnected, operation_id="disconnectAi")
-    def disconnect_ai(idempotency_key: IdempotencyKey):
-        raise not_implemented()
+    def disconnect_ai(idempotency_key: IdempotencyKey, account: CurrentAccount):
+        services.ai_connections.disconnect(account.account_id, idempotency_key)
+        return AiConnectionDisconnected(status="none")

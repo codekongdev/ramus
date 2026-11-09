@@ -57,4 +57,4 @@ class VerifyEmailCodeRequest(ApiRequest):
 
 
 class ConnectAiRequest(ApiRequest):
-    api_key: str = Field(min_length=1, max_length=MAX_API_KEY_LENGTH)
+    api_key: str = Field(min_length=1, max_length=MAX_API_KEY_LENGTH, repr=False)

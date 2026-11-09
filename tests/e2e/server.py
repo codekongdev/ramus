@@ -8,13 +8,24 @@ import os
 import secrets
 import subprocess
 import sys
+from base64 import urlsafe_b64encode
 from pathlib import Path
 
 import uvicorn
+from pydantic import SecretStr
 from ramus_api.main import create_app
+from ramus_api.modules.access.application.errors import AI_KEY_INVALID, AccessRejected
 from ramus_api.settings import Settings
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
+
+
+class TestAiKeyValidator:
+    """Only synthetic test keys are accepted; browser tests can never call OpenAI."""
+
+    async def validate(self, api_key: str) -> None:
+        if not api_key.startswith("valid-test-"):
+            raise AccessRejected(AI_KEY_INVALID)
 
 
 def main() -> None:
@@ -34,7 +45,13 @@ def main() -> None:
                 check=True,
             )
             uvicorn.run(
-                create_app(settings.model_copy(update={"database_url": database_url})),
+                create_app(
+                    settings.model_copy(update={
+                        "database_url": database_url,
+                        "secret_key": SecretStr(urlsafe_b64encode(secrets.token_bytes(32)).decode()),
+                    }),
+                    ai_key_validator=TestAiKeyValidator(),
+                ),
                 host="127.0.0.1",
                 port=settings.api_port,
             )

@@ -32,6 +32,10 @@
   border-bottom: var(--hairline) solid var(--chrome-border);
 }
 
+.app-shell__top [data-slot="participants"] {
+  margin-left: auto;
+}
+
 .app-shell__left {
   grid-area: left;
   display: flex;
