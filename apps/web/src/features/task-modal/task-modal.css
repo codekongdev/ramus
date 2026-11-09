@@ -1,0 +1,23 @@
+.ramus.task-modal { width: min(860px, calc(100vw - var(--spacing) * 8)); max-height: calc(100dvh - var(--spacing) * 8); }
+.task-modal .h-dialog-header { flex-wrap: wrap; gap: calc(var(--spacing) * 3); }
+.task-modal .h-dialog-title { min-width: 0; overflow-wrap: anywhere; }
+.task-modal .h-dialog-body { padding: 0 calc(var(--spacing) * 6) calc(var(--spacing) * 6); }
+.task-modal__conversation { display: flex; flex-direction: column; gap: calc(var(--spacing) * 4); }
+.task-modal__goal { padding: calc(var(--spacing) * 4); border: var(--hairline) solid var(--border); border-radius: var(--radius); background: var(--muted); }
+.task-modal__goal h3 { margin: 0 0 calc(var(--spacing) * 2); font-size: var(--text-sm); }
+.task-modal__goal p, .task-modal__progress p, .task-modal__composer-actions p { margin: 0; }
+.task-modal__goal p, .task-modal__message-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+.task-modal__progress { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: calc(var(--spacing) * 3); color: var(--muted-foreground); font-size: var(--text-sm); }
+.task-modal__messages { min-height: 160px; max-height: 38dvh; overflow-y: auto; display: flex; flex-direction: column; gap: calc(var(--spacing) * 4); padding: var(--spacing); scroll-padding: calc(var(--spacing) * 2); }
+.task-modal__messages:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.task-modal__empty { color: var(--muted-foreground); }
+.task-modal__composer { display: flex; flex-direction: column; gap: calc(var(--spacing) * 2); }
+.task-modal__composer textarea { min-height: 96px; max-height: 200px; }
+.task-modal__composer-actions { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--spacing) * 4); }
+.task-modal__composer-actions p { color: var(--muted-foreground); font-size: var(--text-sm); }
+.task-modal__error { color: var(--destructive); padding-block: calc(var(--spacing) * 3); overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .task-modal .h-dialog-body { padding-inline: calc(var(--spacing) * 3); }
+  .task-modal .ui-dialog-actions { flex-wrap: wrap; }
+  .task-modal__composer-actions { align-items: flex-start; }
+}
