@@ -1,35 +1,35 @@
 # Ramus
 
-개발 컨벤션과 환경 설정.
+Development conventions and environment setup.
 
-- [CONVENTIONS.md](CONVENTIONS.md): 아키텍처와 공통 구현 규칙
-- [AGENTS.md](AGENTS.md): 에이전트 작업 규칙
-- [A5 자동 분기 연결](docs/a5-auto-branch.md): work 실행기 조립, 입력 범위·버전 상속, 로컬 검증
-- `apps/web/`: React · TypeScript · Vite · Vitest 설정
-- `apps/api/`: Python · FastAPI · Ruff · pytest 설정
-- `compose.yaml`: 로컬 PostgreSQL 설정
-- `playwright.config.ts`: 브라우저 테스트 설정
+- [CONVENTIONS.md](CONVENTIONS.md): Architecture and shared implementation rules
+- [AGENTS.md](AGENTS.md): Agent workflow rules
+- [A5 automatic branching integration](docs/a5-auto-branch.md): Work executor assembly, input scope and version inheritance, and local verification
+- `apps/web/`: React · TypeScript · Vite · Vitest setup
+- `apps/api/`: Python · FastAPI · Ruff · pytest setup
+- `compose.yaml`: Local PostgreSQL configuration
+- `playwright.config.ts`: Browser test configuration
 
-## 개발 환경
+## Development environment
 
-Node.js, pnpm 11.3.0, Python 3.12+, uv를 사용한다.
-로컬 PostgreSQL을 실행할 때는 Docker Compose가 필요하다.
+Use Node.js, pnpm 11.3.0, Python 3.12+, and uv.
+Docker Compose is required to run PostgreSQL locally.
 
-의존성 설치:
+Install dependencies:
 
 ```sh
 pnpm install --frozen-lockfile
 uv sync --project apps/api --locked
 ```
 
-환경변수는 `.env.example`을 참고해 로컬 `.env`에 설정한다.
-실제 키와 로컬 데이터는 커밋하지 않는다.
+Configure environment variables in a local `.env` file using `.env.example` as a reference.
+Do not commit real keys or local data.
 
-개인 AI 키 연결에는 `RAMUS_SECRET_KEY`가 필요하다. `python3 -c 'import secrets; print(secrets.token_urlsafe(32))'`로 생성한 값을 로컬 `.env`에 설정한다. 서버는 이 값으로 계정별 키를 암호화한다. 값을 바꾸거나 잃으면 기존 키를 복호화할 수 없으므로 계정에서 다시 연결해야 한다. 연결 검증은 `OPENAI_MODEL`에 설정한 모델에 최대 16 출력 토큰의 짧은 요청을 보내므로 소액의 API 사용료가 발생할 수 있다. 테스트는 검증 어댑터를 주입하므로 실제 API를 호출하지 않는다.
+Connecting a personal AI key requires `RAMUS_SECRET_KEY`. Generate a value with `python3 -c 'import secrets; print(secrets.token_urlsafe(32))'` and set it in your local `.env` file. The server uses this value to encrypt each account's key. If you change or lose it, existing keys cannot be decrypted and must be reconnected through the account. Connection validation sends a short request with at most 16 output tokens to the model configured in `OPENAI_MODEL`, which may incur a small API charge. Tests inject a validation adapter and do not call the real API.
 
-## 워크트리별 설정
+## Per-worktree configuration
 
-워크트리마다 루트 `.env`에서 DB 이름과 두 포트를 다르게 지정한다. Postgres 서버(`pnpm db:up`)는 함께 쓴다.
+Set a unique database name and both ports in each worktree's root `.env` file. Worktrees share the PostgreSQL server (`pnpm db:up`).
 
 ```sh
 DATABASE_URL=postgresql+psycopg://ramus:ramus-local@127.0.0.1:55432/ramus_wt2
@@ -37,66 +37,66 @@ RAMUS_WEB_PORT=5183
 RAMUS_API_PORT=8010
 ```
 
-개발용 DB를 만들고 마이그레이션을 적용한다(저장소 루트에서 실행).
+Create the development database and apply migrations from the repository root:
 
 ```sh
 docker compose exec db createdb -U ramus ramus_wt2
 uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
 ```
 
-전체 테이블·컬럼·제약의 기준은 [스키마 계약](docs/contracts.md#5-테이블-스키마)이다.
-마이그레이션 후 공동 샘플 프로젝트를 준비한다.
+The [schema contract](docs/contracts.md#5-테이블-스키마) is the source of truth for all tables, columns, and constraints.
+After applying migrations, initialize the shared sample project:
 
 ```sh
 uv run --project apps/api python -m ramus_api.modules.seed
 ```
 
-이 명령은 고정 시드 키에서 UUIDv5를 만들고 `project_id`를 JSON으로 출력한다.
-여러 번 또는 동시에 실행해도 프로젝트와 시드 표식은 하나만 생성하며, 기존 이름과 데이터를 유지한다.
-예시 대화·자료·결과 콘텐츠는 후속 작업에서 추가한다.
-로그인하면 공동 샘플 프로젝트에 편집 참여자로 자동 등록된다. 시드 명령을 실행하지 않았어도 첫 로그인 때 프로젝트가 만들어진다.
+This command derives a UUIDv5 from a fixed seed key and prints `project_id` as JSON.
+Repeated or concurrent runs create only one project and seed marker, preserving existing names and data.
+Sample conversations, resources, and result content will be added in later work.
+Users are automatically added to the shared sample project as editing participants when they sign in. The project is created on the first sign-in even if the seed command has not been run.
 
-## 대화·메시지 백엔드 (A2)
+## Conversation and message backend (A2)
 
-참여자는 프로젝트의 대화 트리·제목 검색·상세를 조회하고 최상위 대화를 만들 수 있다.
-메시지 작성자는 세션에서, 순서는 서버에서 결정한다. 메시지 목록은 `after_seq`와 `limit`으로
-조회하며, 변경 요청은 `Idempotency-Key`로 중복 생성을 막는다.
+Participants can view a project's conversation tree and conversation details, search by title, and create top-level conversations.
+Message authors are determined from the session, and message order is assigned by the server. Use `after_seq` and `limit`
+to retrieve messages. Mutation requests use `Idempotency-Key` to prevent duplicate creation.
 
-`/api/projects/{project_id}/events`는 프로젝트 참여자에게 SSE 이벤트를 보낸다.
-15초마다 연결 유지와 세션·참여 권한을 확인한다. 이벤트 이력은 재전송하지 않으므로
-클라이언트는 연결이 열릴 때 상태를 다시 조회하고, 메시지는 마지막 `seq` 이후를 조회한다.
-현재 브로커는 API 프로세스 하나에서 동작한다. 여러 프로세스로 실행하려면 공유 전송 어댑터가 필요하다.
+`/api/projects/{project_id}/events` sends SSE events to project participants.
+Every 15 seconds, the stream sends a keepalive and checks the session and project membership. Event history is not replayed,
+so clients must refetch state when a connection opens and retrieve messages after the last `seq`.
+The current broker runs within a single API process. Running multiple processes requires a shared transport adapter.
 
-`@AI`가 포함된 메시지는 실행 등록과 함께 저장한다. 요청자의 AI 연결이 없거나 같은 대화에
-활성 실행이 있으면 메시지를 저장하지 않고 409를 반환한다. 현재 앱 연결은 pending 실행 등록까지이며,
-실제 모델 호출은 AI 연결·입력 조립·목적별 핸들러와 워커를 연결한 뒤 동작한다.
+Messages containing `@AI` are saved together with a registered run. If the requester has no AI connection or the same conversation
+already has an active run, the API returns 409 without saving the message. The app currently supports registering pending runs;
+actual model calls require wiring together the AI connection, input assembly, purpose-specific handlers, and worker.
 
-## 서버 실행
+## Running the servers
 
-API는 `uv run --project apps/api python -m ramus_api`, 웹은 `pnpm --filter @ramus/web dev`로 띄운다.
-웹 개발 서버는 `/api` 요청을 `RAMUS_API_PORT`로 넘긴다.
+Start the API with `uv run --project apps/api python -m ramus_api` and the web app with `pnpm --filter @ramus/web dev`.
+The web development server forwards `/api` requests to `RAMUS_API_PORT`.
 
-개발 환경에서는 메일을 보내지 않는다. 로그인 인증 코드는 API 서버 터미널 로그에 `[DEV MAIL - not sent]` 줄로 출력된다.
-HTTPS로 서비스하는 환경에서는 `RAMUS_COOKIE_SECURE=true`로 세션 쿠키에 `Secure`를 붙인다.
-배포 환경에서는 `RAMUS_AUTH_SECRET`에 32자 이상의 고정 비밀값을 설정한다. 인증 코드와 로그인 receipt의 HMAC에 사용하며, 비워 두면 개발 서버를 다시 시작할 때마다 임시값이 바뀌어 발급 중인 코드와 재시도 receipt가 무효화된다.
+No email is sent in development. Sign-in verification codes appear in the API server's terminal logs on a `[DEV MAIL - not sent]` line.
+When serving over HTTPS, set `RAMUS_COOKIE_SECURE=true` to add the `Secure` attribute to session cookies.
+In deployed environments, set `RAMUS_AUTH_SECRET` to a stable secret of at least 32 characters. It is used for the HMAC of verification codes and sign-in receipts. If left empty, a new temporary value is generated each time the development server restarts, invalidating outstanding codes and retry receipts.
 
-테스트(`uv run --project apps/api pytest`)는 `DATABASE_URL`의 개발용 DB를 쓰지 않는다.
-같은 서버에 `ramus_test_<무작위>` 임시 DB를 매번 만들어 마이그레이션하고, 끝나면 지운다.
-Postgres가 꺼져 있으면 통합 테스트는 실패한다. 단위 테스트만 돌릴 때는 `-m "not integration"`을 붙인다.
+Tests (`uv run --project apps/api pytest`) do not use the development database specified by `DATABASE_URL`.
+Each run creates and migrates a temporary `ramus_test_<random>` database on the same server, then removes it when finished.
+Integration tests fail if PostgreSQL is not running. Add `-m "not integration"` to run unit tests only.
 
-로그인 브라우저 테스트는 `pnpm test:e2e`로 실행한다. 처음 실행할 때는 `pnpm exec playwright install chromium`으로 브라우저를 설치한다.
-테스트가 임시 DB를 만들고 마이그레이션한 뒤 API·웹 서버를 빈 포트에서 실행하며, 종료 시 서버와 임시 DB를 정리한다.
-개발 메일러가 출력한 코드를 fixture 내부에서만 읽고 실제 메일은 보내지 않는다. 재전송 테스트는 실제 60초 제한이 끝날 때까지 기다린다.
+Run the sign-in browser tests with `pnpm test:e2e`. Before the first run, install the browser with `pnpm exec playwright install chromium`.
+The tests create and migrate a temporary database, start the API and web servers on available ports, and clean up the servers and temporary database when finished.
+Codes printed by the development mailer are read only within the fixture; no real email is sent. Resend tests wait for the actual 60-second rate limit to expire.
 
-## 전체 검증
+## Full verification
 
 ```sh
-pnpm verify                     # 웹 타입·테스트, API lint·단위·통합, 계약(OpenAPI) 검사, 한글 문구 검사를 한 번에 실행
-pnpm verify --only web,api:lint # 영역(web·api·contract·i18n·scripts) 또는 단계 ID만 실행
-pnpm verify --list              # 단계 목록
+pnpm verify                     # Run web type checks and tests, API lint and unit/integration tests, OpenAPI contract checks, and Korean text checks
+pnpm verify --only web,api:lint # Run selected areas (web, api, contract, i18n, scripts) or step IDs
+pnpm verify --list              # List verification steps
 ```
 
-실패한 단계가 있어도 나머지를 끝까지 실행하고 마지막에 단계별 PASS·FAIL·SKIP을 보여 준다.
-`i18n:hangul`은 `apps/web/src/features`의 `.tsx`에 한글 문구가 있으면 실패한다. 화면 문구는 기능 폴더의 `messages.ts`에 둔다(로드맵 9.3).
-uv가 없거나 Postgres가 꺼져 있으면 그 단계는 SKIP이다.
-SKIP은 통과가 아니므로 종료 코드 1을 돌려준다. 실행하지 못한 것을 알고 넘어갈 때만 `--allow-skip`을 붙인다.
+Verification continues through all steps even if some fail, then reports PASS, FAIL, or SKIP for each step.
+`i18n:hangul` fails if Korean text appears in `.tsx` files under `apps/web/src/features`. Keep UI text in each feature folder's `messages.ts` (roadmap 9.3).
+Steps that require uv or PostgreSQL are marked SKIP if uv is unavailable or PostgreSQL is not running.
+SKIP is not a pass, so verification exits with code 1. Add `--allow-skip` only when you intentionally accept that some checks could not run.
