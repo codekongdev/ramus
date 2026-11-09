@@ -26,10 +26,17 @@ describe('next', () => {
 });
 
 describe('createStore', () => {
-  it('drops intents before activation', () => {
-    const store = createStore(reducer, initial, vi.fn());
+  it('queues intents dispatched before activation and replays them in order', () => {
+    const handler = vi.fn();
+    const store = createStore(reducer, initial, handler);
     store.dispatch({ type: 'loaded', value: 3 });
+    store.dispatch({ type: 'load' });
     expect(store.getState()).toBe(initial);
+    expect(handler).not.toHaveBeenCalled();
+
+    store.activate();
+    expect(store.getState()).toEqual({ count: 3, loading: true });
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 
   it('reduces, notifies listeners and runs effects with a result dispatch', async () => {
@@ -67,7 +74,7 @@ describe('createStore', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it('aborts effects on deactivate and drops their late results', async () => {
+  it('aborts effects after deactivate and drops their late results', async () => {
     let resolve!: () => void;
     let seenSignal!: AbortSignal;
     const handler: EffectHandler<Effect, Intent> = async (_effect, dispatch, signal) => {
@@ -79,13 +86,34 @@ describe('createStore', () => {
     store.activate();
     store.dispatch({ type: 'load' });
     store.deactivate();
+    expect(seenSignal.aborted).toBe(false); // teardown waits one microtask
+    await Promise.resolve();
     expect(seenSignal.aborted).toBe(true);
 
-    store.activate(); // e.g. StrictMode remount: a fresh signal, the old effect stays dead
     resolve();
     await Promise.resolve();
     await Promise.resolve();
     expect(store.getState()).toEqual({ count: 0, loading: true });
+  });
+
+  it('keeps running effects when re-activated in the same tick (StrictMode remount)', async () => {
+    let resolve!: () => void;
+    let seenSignal!: AbortSignal;
+    const handler: EffectHandler<Effect, Intent> = async (_effect, dispatch, signal) => {
+      seenSignal = signal;
+      await new Promise<void>((r) => (resolve = r));
+      dispatch({ type: 'loaded', value: 5 });
+    };
+    const store = createStore(reducer, initial, handler);
+    store.activate();
+    store.dispatch({ type: 'load' });
+    store.deactivate();
+    store.activate();
+    await Promise.resolve();
+    expect(seenSignal.aborted).toBe(false);
+
+    resolve();
+    await vi.waitFor(() => expect(store.getState()).toEqual({ count: 5, loading: false }));
   });
 
   it('reports effect handler failures instead of swallowing them', async () => {
