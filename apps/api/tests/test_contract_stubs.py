@@ -20,7 +20,7 @@ ID = str(uuid4())
 # Implemented behavior is covered by the access/conversation/realtime integration suites.
 IMPLEMENTED = frozenset({
     "requestEmailCode", "verifyEmailCode", "logout", "getMe", "getAiConnection", "connectAi", "disconnectAi",
-    "listProjects", "listProjectParticipants",
+    "listProjects", "createProject", "searchProjects", "listProjectParticipants",
     "listConversations", "createConversation", "searchConversations", "getConversation",
     "listMessages", "postMessage", "streamProjectEvents",
     "listResources", "createResource", "listAppliedResources", "replaceAppliedResources",
@@ -120,10 +120,10 @@ def test_malformed_idempotency_key_is_rejected(client: TestClient) -> None:
     assert response.json()["error"]["code"] == "IDEMPOTENCY_KEY_INVALID"
 
 
-def test_invalid_body_is_422_invalid_input(client: TestClient) -> None:
+def test_project_creation_requires_login_before_body_validation(client: TestClient) -> None:
     response = client.post("/api/projects", json={}, headers=KEY)
-    assert response.status_code == 422
-    assert response.json()["error"]["code"] == "INVALID_INPUT"
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "UNAUTHORIZED"
 
 
 def test_message_body_longer_than_the_limit_is_rejected_by_schema() -> None:

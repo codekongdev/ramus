@@ -22,7 +22,7 @@ from ramus_api.modules.access.infrastructure.openai_key_validator import OpenAiK
 from ramus_api.modules.access.infrastructure.project_access import SqlAiConnectionQuery, SqlProjectAccess
 from ramus_api.modules.access.infrastructure.stores import SqlAccountStore
 from ramus_api.modules.access.presentation.routes import register as register_access
-from ramus_api.modules.access.public import MembershipReader
+from ramus_api.modules.access.public import MembershipReader, MembershipWriter
 from ramus_api.modules.conversations.composition import CommittedEvents
 from ramus_api.modules.conversations.infrastructure.repository import SqlConversationRepository
 from ramus_api.modules.conversations.infrastructure.writer import SqlConversationWriter
@@ -71,7 +71,11 @@ class SharedSampleProject:
 MODULES: tuple[ModuleRegistrar, ...] = (
     register_system,
     partial(register_access, shared_project=SharedSampleProject()),
-    partial(register_projects, memberships=MembershipReader(SqlAccountStore())),
+    partial(
+        register_projects,
+        memberships=MembershipReader(SqlAccountStore()),
+        membership_writer=MembershipWriter(SqlAccountStore()),
+    ),
     register_conversations,
     register_execution,
     register_realtime,

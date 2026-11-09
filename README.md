@@ -5,6 +5,7 @@ Development conventions and environment setup.
 - [CONVENTIONS.md](CONVENTIONS.md): Architecture and shared implementation rules
 - [AGENTS.md](AGENTS.md): Agent workflow rules
 - [A5 automatic branching integration](docs/a5-auto-branch.md): Work executor assembly, input scope and version inheritance, and local verification
+- [A8 project switching and creation](docs/a8-projects.md): Project access, idempotent creation, navigation, and local verification
 - `apps/web/`: React · TypeScript · Vite · Vitest setup
 - `apps/api/`: Python · FastAPI · Ruff · pytest setup
 - `compose.yaml`: Local PostgreSQL configuration
@@ -70,6 +71,14 @@ The current broker runs within a single API process. Running multiple processes 
 Messages containing `@AI` are saved together with a registered run. If the requester has no AI connection or the same conversation
 already has an active run, the API returns 409 without saving the message. The app currently supports registering pending runs;
 actual model calls require wiring together the AI connection, input assembly, purpose-specific handlers, and worker.
+
+## Project switching and creation (A8)
+
+Use the project name in the top bar to search your projects, switch workspaces, or create a new project.
+Creation selects the new workspace and grants its creator editing access. Other accounts continue to join
+the shared sample on sign-in; they do not automatically join newly created projects.
+Project and conversation URLs survive reloads and browser history navigation. A creation retry after a lost
+response reuses its idempotency key, so it selects the already created project without creating a duplicate.
 
 ## Running the servers
 

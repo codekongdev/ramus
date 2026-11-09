@@ -3,13 +3,12 @@
 from typing import Literal
 from uuid import UUID
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, field_validator
 
 from ramus_api.modules.access.presentation.dto import Account
 from ramus_api.modules.execution.presentation.dto import TaskStatus
+from ramus_api.modules.projects.domain.project import MAX_PROJECT_NAME_LENGTH, validate_project_name
 from ramus_api.shared.presentation.schemas import ApiRequest, ApiResponse
-
-MAX_PROJECT_NAME_LENGTH = 100
 
 GraphEdgeKind = Literal["branch", "uses_result"]
 
@@ -30,6 +29,11 @@ class ProjectParticipants(ApiResponse):
 
 class CreateProjectRequest(ApiRequest):
     name: str = Field(min_length=1, max_length=MAX_PROJECT_NAME_LENGTH)
+
+    @field_validator("name")
+    @classmethod
+    def meaningful_name(cls, value: str) -> str:
+        return validate_project_name(value)
 
 
 class GraphNode(ApiResponse):
