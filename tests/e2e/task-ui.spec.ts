@@ -28,6 +28,10 @@ async function fixture(page: Page, accountId = 'u1', connected = true) {
       if (path === '/api/projects/p1/participants') return json({ items: [me.account] });
       if (path === '/api/projects/p1/conversations') return json({ items: [parent, conversation] });
       if (path === '/api/conversations/c1/tasks') return json({ items: [task] });
+      if (path === '/api/conversations/c1') return json(parent);
+      if (path === '/api/conversations/c1/messages') return json({ items: Array.from({ length: 32 }, (_, index) => ({
+        ...initialMessage, id: `parent-${index}`, conversation_id: 'c1', seq: index + 1, body: `부모 대화의 논의 ${index + 1}`,
+      })), next_after_seq: null });
       if (path === '/api/tasks/t1') return json(task);
       if (path === '/api/conversations/child1') return json(conversation);
       if (path === '/api/conversations/child1/messages') return json({ items: messages, next_after_seq: null });
@@ -75,6 +79,13 @@ test('queue and tree open one task modal without navigating; updates and close d
   await update('ready');
   await expect(queue).toContainText('준비됨');
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  const parentPanel = page.locator('[data-slot="conversation"]');
+  await expect(parentPanel.getByRole('heading', { name: parent.title })).toBeVisible();
+  const parentDraft = parentPanel.getByLabel('메시지', { exact: true });
+  await parentDraft.fill('작업을 보는 동안에도 유지할 부모 초안');
+  const parentMessages = parentPanel.getByRole('log');
+  const scrollTop = await parentMessages.evaluate(element => { element.scrollTop = 150; return element.scrollTop; });
+  expect(scrollTop).toBeGreaterThan(0);
   await queue.getByRole('button', { name: /경쟁사 분석/ }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toContainText(initialMessage.body);
@@ -88,6 +99,8 @@ test('queue and tree open one task modal without navigating; updates and close d
   await expect(dialog).toContainText('@AI 예외 사례도 보완해 주세요.');
   await dialog.getByRole('button', { name: '닫기', exact: true }).click();
   await expect(dialog).toHaveCount(0);
+  await expect(parentDraft).toHaveValue('작업을 보는 동안에도 유지할 부모 초안');
+  expect(await parentMessages.evaluate(element => element.scrollTop)).toBe(scrollTop);
   expect(mutations.filter(path => path.endsWith('/cancel'))).toHaveLength(0);
   await expect(page).toHaveURL(/\/projects\/p1\/conversations\/c1$/);
   await page.locator('[data-slot="conversation-tree"]').getByRole('button', { name: /경쟁사 분석/ }).click();
@@ -95,6 +108,8 @@ test('queue and tree open one task modal without navigating; updates and close d
   await expect(page.locator('dialog')).toHaveCount(1);
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
+  await expect(parentDraft).toHaveValue('작업을 보는 동안에도 유지할 부모 초안');
+  expect(await parentMessages.evaluate(element => element.scrollTop)).toBe(scrollTop);
   await expect(page).toHaveURL(/\/projects\/p1\/conversations\/c1$/);
 });
 
