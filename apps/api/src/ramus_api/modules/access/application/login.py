@@ -144,6 +144,8 @@ class VerifyEmailCode(Generic[T]):
         account_id = self.accounts.ensure_account(transaction, email, display_name_for(email))
         project_id = self.shared_project.ensure_shared_project(transaction)
         self.accounts.add_membership(transaction, account_id, project_id, MembershipRole.EDITOR)
+        for followup_id in self.shared_project.existing_followup_project_ids(transaction):
+            self.accounts.add_membership(transaction, account_id, followup_id, MembershipRole.EDITOR)
         return {
             "outcome": CodeVerdict.VERIFIED.value,
             "account_id": str(account_id),

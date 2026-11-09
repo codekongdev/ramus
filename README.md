@@ -46,16 +46,35 @@ uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
 ```
 
 The [schema contract](docs/contracts.md#5-테이블-스키마) is the source of truth for all tables, columns, and constraints.
-After applying migrations, initialize the shared sample project:
+After applying migrations, prepare the shared sample projects and fictional content:
 
 ```sh
 uv run --project apps/api python -m ramus_api.modules.seed
 ```
 
-This command derives a UUIDv5 from a fixed seed key and prints `project_id` as JSON.
-Repeated or concurrent runs create only one project and seed marker, preserving existing names and data.
-Sample conversations, resources, and result content will be added in later work.
-Users are automatically added to the shared sample project as editing participants when they sign in. The project is created on the first sign-in even if the seed command has not been run.
+The command prints `project_id` as JSON and uses stable UUIDv5 identities with a separate content version marker.
+On a fresh database, it creates two sample projects, four example authors, the unfinished “멤버십 기능 설계”
+assignment and three A/B/C research conversations, ten messages, three resources at v1, three saved conclusions,
+and three shares with pinned conclusion inputs. The three ready tasks and four succeeded runs are fictional historical
+examples; preparation does not call a model or add pending/running work.
+Repeated or concurrent preparation preserves existing content, user work, and project names.
+Sign-in adds editing memberships to the sample projects without preparing or resetting their content.
+Before preparation, sign-in creates only the default project, with no sample content or follow-up project.
+
+Reset is an operator-only CLI operation, authorized by server and database access. Stop the API and workers and confirm
+that existing work has been backed up or may be removed before running it:
+
+```sh
+uv run --project apps/api python -m ramus_api.modules.seed --reset \
+  --confirm-project-id 52ca4f3a-7913-510c-9e52-064b3f1db1a4 --work-preserved
+```
+
+Reset removes user-created content in both fixed sample projects and restores the examples. It preserves accounts,
+sessions, AI connections, memberships, project names, and unrelated projects. Active runs, conflicting database use,
+or another project's references to the sample conclusions prevent reset and roll back changes.
+There is no HTTP endpoint or product button for reset. See [B9 sample preparation](docs/b9-seed-content.md) for scope
+and local verification. Conclusion sharing, follow-up conversation creation, and the results library remain
+dependent on B5–B8 integration for the full product E2E.
 
 ## Conversation and message backend (A2)
 

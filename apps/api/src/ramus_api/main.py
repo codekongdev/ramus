@@ -38,11 +38,12 @@ from ramus_api.modules.execution.infrastructure.run_store import SqlRunStore
 from ramus_api.modules.execution.infrastructure.summary_gateway import OpenAiGateway
 from ramus_api.modules.execution.presentation.routes import register as register_execution
 from ramus_api.modules.execution.work_composition import build_work_execution_runtime
-from ramus_api.modules.projects.infrastructure.sample import (
+from ramus_api.modules.projects.presentation.routes import register as register_projects
+from ramus_api.modules.projects.public import (
     SHARED_SAMPLE_PROJECT_ID,
     ensure_shared_sample_project,
+    followup_sample_project_id,
 )
-from ramus_api.modules.projects.presentation.routes import register as register_projects
 from ramus_api.modules.realtime.infrastructure.broker import InProcessEventBroker
 from ramus_api.modules.realtime.presentation.routes import register as register_realtime
 from ramus_api.modules.resources.infrastructure.context_provider import build_context_provider
@@ -70,6 +71,10 @@ class SharedSampleProject:
 
     def ensure_shared_project(self, transaction: Session) -> UUID:
         return ensure_shared_sample_project(transaction)
+
+    def existing_followup_project_ids(self, transaction: Session) -> tuple[UUID, ...]:
+        project_id = followup_sample_project_id(transaction)
+        return () if project_id is None else (project_id,)
 
 
 MODULES: tuple[ModuleRegistrar, ...] = (
