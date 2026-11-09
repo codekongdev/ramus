@@ -19,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from ramus_api.shared.application import JsonObject
+from ramus_api.shared.application.idempotency import ExecutionResult
 from ramus_api.shared.domain import fingerprint, idempotency_conflict, new_id, utc_now
 from ramus_api.shared.infrastructure.database import Base, Database
 
@@ -78,29 +79,34 @@ class SqlIdempotentExecutor:
         and holds a pooled connection for its whole duration. For AI work, the operation only
         registers a run; the executor performs the model call separately (roadmap section 3).
         """
+        return self.execute_with_status(actor_id, scope, key, payload, operation).response
+
+    def execute_with_status(
+        self, actor_id: str, scope: str, key: str, payload: Mapping[str, Any], operation: Operation
+    ) -> ExecutionResult:
         identity = (actor_id, scope, key)
         expected = fingerprint(payload)
         try:
             with self._database.transaction() as session:
                 existing = _find(session, identity)
                 if existing is not None:
-                    return _replay(existing, expected)
+                    return ExecutionResult(_replay(existing, expected), replayed=True)
                 receipt = _claim(session, identity, expected)
                 response = _normalize_response(operation(session))
                 receipt.response = response
                 session.flush()
-                return response
+                return ExecutionResult(response, replayed=False)
         except _ConcurrentReceipt as concurrent:
             return self._replay_committed(identity, expected, concurrent)
 
     def _replay_committed(
         self, identity: tuple[str, str, str], expected: str, concurrent: _ConcurrentReceipt
-    ) -> JsonObject:
+    ) -> ExecutionResult:
         with self._database.transaction() as session:
             existing = _find(session, identity)
             if existing is None:
                 raise concurrent.__cause__ or concurrent
-            return _replay(existing, expected)
+            return ExecutionResult(_replay(existing, expected), replayed=True)
 
 
 def _find(session: Session, identity: tuple[str, str, str]) -> RequestReceiptRow | None:

@@ -6,6 +6,7 @@
     "gen:api": "pnpm api:openapi && pnpm --filter @ramus/web gen:api",
     "db:up": "docker compose up -d --wait db",
     "db:stop": "docker compose stop db",
+    "test:e2e": "playwright test",
     "verify": "node scripts/verify/verify.mjs"
   },
   "devDependencies": {

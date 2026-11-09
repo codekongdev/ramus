@@ -33,6 +33,21 @@ class ProfileReader(Generic[T]):
     transactions: TransactionFactory[T]
     accounts: AccountStore[T]
     shared_project: SharedProjectProvider[T]
+    sessions: SessionStore[T]
+    clock: Clock
+
+    def authenticated_me(self, token: str | None) -> MeProfile | None:
+        if not token:
+            return None
+        with self.transactions() as transaction:
+            account = self.sessions.find_active(transaction, hash_session_token(token), self.clock.now())
+            if account is None:
+                return None
+            profile = self.accounts.get_profile(transaction, account.account_id)
+            if profile is None:
+                return None
+            status = self.accounts.ai_connection_status(transaction, account.account_id)
+            return MeProfile(profile, self.shared_project.project_id, status)
 
     def get_me(self, account_id: UUID) -> MeProfile:
         with self.transactions() as transaction:

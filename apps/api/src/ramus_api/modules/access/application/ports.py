@@ -16,6 +16,7 @@ from ramus_api.modules.access.domain.models import (
     AuthenticatedAccount,
     MembershipRole,
 )
+from ramus_api.shared.application.notifications import Mailer as Mailer
 
 TransactionT = TypeVar("TransactionT", contravariant=True)
 TransactionT_co = TypeVar("TransactionT_co", covariant=True)
@@ -25,10 +26,6 @@ class CredentialProvider(Protocol):
     """Executor-only access. Never store its return value in a run, event, or log."""
 
     def get_api_key(self, account_id: UUID) -> str: ...
-
-
-class Mailer(Protocol):
-    async def send_code(self, email: str, code: str) -> None: ...
 
 
 class Clock(Protocol):
@@ -93,6 +90,10 @@ class AccountStore(Protocol[TransactionT]):
         """Adds the membership; an existing one is left as it is."""
 
     def get_profile(self, transaction: TransactionT, account_id: UUID) -> AccountProfile | None: ...
+
+    def project_ids(self, transaction: TransactionT, account_id: UUID) -> list[UUID]: ...
+
+    def participants(self, transaction: TransactionT, project_id: UUID) -> list[AccountProfile]: ...
 
     def ai_connection_status(self, transaction: TransactionT, account_id: UUID) -> AIConnectionStatus: ...
 

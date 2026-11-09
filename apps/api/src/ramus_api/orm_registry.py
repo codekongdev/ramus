@@ -6,6 +6,7 @@ Add one import line here when a module gains ORM models.
 from ramus_api.modules.access.infrastructure.models import (
     AccountRow,
     AIConnectionRow,
+    AuthAttemptRow,
     EmailCodeRow,
     MembershipRow,
     SessionRow,
@@ -28,6 +29,7 @@ metadata = Base.metadata
 
 __all__ = [
     "AccountRow",
+    "AuthAttemptRow",
     "MembershipRow",
     "EmailCodeRow",
     "SessionRow",

@@ -7,12 +7,17 @@ import { ModalHostProvider, useModalHost, type ModalHostApi } from '../../src/ap
 import { navigate } from '../../src/app/routing/useRoute';
 import { Dialog } from '../../src/ui';
 
+const apiMocks = vi.hoisted(() => ({ GET: vi.fn(), POST: vi.fn() }));
+vi.mock('../../src/lib/api/app', () => ({ api: apiMocks }));
+const me = { account: { id: 'a1', email: 'person@example.test', display_name: 'Person' }, default_project_id: 'p1', ai_connection: { status: 'none' } };
+
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let container: HTMLElement;
 let root: Root;
 
 beforeEach(() => {
+  apiMocks.GET.mockImplementation(async (path: string) => ({ data: path === '/api/me' ? me : path === '/api/projects' ? { items: [{ id: 'p1', name: 'Shared project', is_shared_sample: true }] } : { items: [me.account] }, response: new Response('{}') }));
   HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
     this.setAttribute('open', '');
   });
@@ -34,42 +39,49 @@ const page = () => container.querySelector('[data-page]')?.getAttribute('data-pa
 const hasShell = () => container.querySelector('.app-shell') !== null;
 
 describe('App routing', () => {
-  it('shows the empty workspace shell at /', () => {
-    act(() => root.render(createElement(App)));
+  it('restores the session and opens the shared workspace at /', async () => {
+    await act(async () => root.render(createElement(App)));
     expect(hasShell()).toBe(true);
+    expect(window.location.pathname).toBe('/projects/p1');
+    expect(container.textContent).toContain('Shared project');
+    expect(container.textContent).toContain('Person');
   });
 
-  it('switches pages on navigate and on browser back', () => {
-    act(() => root.render(createElement(App)));
-
-    act(() => navigate({ name: 'login' }));
-    expect(window.location.pathname).toBe('/login');
+  it('protects workspace routes when no session exists', async () => {
+    apiMocks.GET.mockResolvedValue({ error: { error: { code: 'UNAUTHORIZED', message: 'login', details: null } }, response: new Response('{}', { status: 401 }) });
+    await act(async () => root.render(createElement(App)));
     expect(page()).toBe('login');
     expect(hasShell()).toBe(false);
+    expect(window.location.pathname).toBe('/login');
+    await act(async () => navigate({ name: 'workspace', projectId: 'p1', conversationId: 'c1' }));
+    expect(window.location.pathname).toBe('/login');
+    expect(hasShell()).toBe(false);
+  });
 
-    act(() => navigate({ name: 'workspace', projectId: 'p1', conversationId: 'c1' }));
-    expect(window.location.pathname).toBe('/projects/p1/conversations/c1');
+  it('preserves a project conversation deep link for an authenticated account', async () => {
+    window.history.replaceState(null, '', '/projects/p1/conversations/c1');
+    await act(async () => root.render(createElement(App)));
     expect(hasShell()).toBe(true);
-
-    act(() => {
+    expect(window.location.pathname).toBe('/projects/p1/conversations/c1');
+    await act(async () => {
       window.history.replaceState(null, '', '/login');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
-    expect(page()).toBe('login');
+    expect(window.location.pathname).toBe('/projects/p1');
   });
 
-  it('shows not found for unknown paths', () => {
+  it('shows not found for unknown paths', async () => {
     window.history.replaceState(null, '', '/nope');
-    act(() => root.render(createElement(App)));
+    await act(async () => root.render(createElement(App)));
     expect(page()).toBe('not-found');
   });
 
-  it('replace navigation does not add a history entry', () => {
-    act(() => root.render(createElement(App)));
+  it('replace navigation does not add a history entry', async () => {
+    await act(async () => root.render(createElement(App)));
     const before = window.history.length;
-    act(() => navigate({ name: 'login' }, { replace: true }));
+    await act(async () => navigate({ name: 'workspace', projectId: 'p2' }, { replace: true }));
     expect(window.history.length).toBe(before);
-    expect(page()).toBe('login');
+    expect(hasShell()).toBe(true);
   });
 });
 

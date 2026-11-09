@@ -1,0 +1,23 @@
+.auth-page { padding: calc(var(--spacing) * 6); }
+.auth-card { width: min(100%, 420px); }
+.auth-brand { font-size: 24px; font-weight: 650; letter-spacing: -0.04em; margin-bottom: 48px; }
+.auth-card h1 { margin: 0 0 14px; font-size: clamp(24px, 5vw, 30px); font-weight: 550; letter-spacing: -0.04em; line-height: 1.35; }
+.auth-description { margin: 0 0 32px; color: var(--muted-foreground); line-height: 1.7; overflow-wrap: anywhere; }
+.auth-form, .auth-code-field { display: grid; gap: 16px; }
+.auth-form input { min-height: 48px; font-size: 16px; }
+.auth-code-field { gap: 12px; }
+.auth-code-field > label { font-size: 14px; font-weight: 500; }
+.auth-submit { width: 100%; min-height: 48px; }
+.auth-actions { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.auth-actions button { min-height: 44px; }
+.auth-hint { margin: 0; color: var(--muted-foreground); font-size: 13px; }
+.auth-error { margin: 0; color: var(--destructive); font-size: 14px; line-height: 1.6; }
+.auth-session { display: grid; justify-items: center; gap: 16px; padding: 24px; }
+.auth-participants { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.auth-participants details { position: relative; }
+.auth-participants summary { cursor: pointer; padding: 8px; min-height: 44px; display: flex; align-items: center; color: var(--muted-foreground); }
+.auth-participants ul { position: absolute; z-index: 10; right: 0; min-width: 240px; max-height: 320px; overflow-y: auto; list-style: none; padding: 12px; margin: 8px 0 0; background: var(--popover); border: 1px solid var(--border); box-shadow: var(--shadow-lg); }
+.auth-participants li { display: flex; align-items: center; gap: 10px; padding: 8px; overflow-wrap: anywhere; }
+.auth-account { display: flex; align-items: center; gap: 8px; }
+.auth-account-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auth-project-name { font-size: 14px; font-weight: 550; }

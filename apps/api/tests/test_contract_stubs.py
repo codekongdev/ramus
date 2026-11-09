@@ -18,7 +18,9 @@ KEY = {"Idempotency-Key": "test-key-1"}
 ID = str(uuid4())
 
 # P0-A4 login; covered by test_access_*_integration.py.
-IMPLEMENTED = frozenset({"requestEmailCode", "verifyEmailCode", "logout", "getMe"})
+IMPLEMENTED = frozenset(
+    {"requestEmailCode", "verifyEmailCode", "logout", "getMe", "listProjects", "listProjectParticipants"}
+)
 STUBS = tuple(e for e in CONTRACT_ENDPOINTS if e.operation_id not in IMPLEMENTED)
 
 BODIES: dict[str, dict] = {

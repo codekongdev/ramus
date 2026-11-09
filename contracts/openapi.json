@@ -1049,6 +1049,22 @@
         "title": "ProjectList",
         "type": "object"
       },
+      "ProjectParticipants": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Account"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ProjectParticipants",
+        "type": "object"
+      },
       "ProjectResultList": {
         "properties": {
           "items": {
@@ -1985,7 +2001,7 @@
         "additionalProperties": false,
         "properties": {
           "code": {
-            "pattern": "^\\d{6}$",
+            "pattern": "^[0-9]{6}$",
             "title": "Code",
             "type": "string"
           },
@@ -3492,6 +3508,59 @@
           }
         },
         "summary": "Get Project Graph",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/projects/{project_id}/participants": {
+      "get": {
+        "operationId": "listProjectParticipants",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectParticipants"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Client error"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Server error"
+          }
+        },
+        "summary": "List Participants",
         "tags": [
           "projects"
         ]

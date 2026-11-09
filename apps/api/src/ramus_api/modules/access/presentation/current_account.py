@@ -21,7 +21,6 @@ from collections.abc import Callable
 from fastapi import Request
 
 from ramus_api.container import AppContainer
-from ramus_api.modules.access.composition import build_authenticator
 from ramus_api.modules.access.domain.models import AuthenticatedAccount
 from ramus_api.modules.access.presentation.cookies import read_session_token
 from ramus_api.modules.access.presentation.errors import unauthorized
@@ -31,7 +30,7 @@ __all__ = ["AuthenticatedAccount", "require_account"]
 
 def require_account(container: AppContainer) -> Callable[[Request], AuthenticatedAccount]:
     """Returns a FastAPI dependency resolving the session cookie to an ``AuthenticatedAccount``."""
-    authenticator = build_authenticator(container.database)
+    authenticator = container.authenticator
 
     def current_account(request: Request) -> AuthenticatedAccount:
         account = authenticator.authenticate(read_session_token(request))

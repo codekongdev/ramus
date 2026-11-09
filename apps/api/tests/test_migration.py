@@ -13,6 +13,7 @@ SCHEMA_TABLES = sorted(
         "account",
         "membership",
         "email_code",
+        "auth_attempt",
         "session",
         "ai_connection",
         "conversation",

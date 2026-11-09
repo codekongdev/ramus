@@ -73,3 +73,15 @@ class AIConnectionRow(Base):
     status: Mapped[str] = mapped_column(String(16))
     verified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AuthAttemptRow(Base):
+    """Only opaque subject digests are stored, never an IP or submitted code."""
+
+    __tablename__ = "auth_attempt"
+    __table_args__ = (Index("ix_auth_attempt_scope_subject_created", "scope", "subject_hash", "created_at"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    scope: Mapped[str] = mapped_column(String(24))
+    subject_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

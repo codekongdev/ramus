@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import ConfigDict, Field
 
+from ramus_api.modules.access.presentation.dto import Account
 from ramus_api.modules.execution.presentation.dto import TaskStatus
 from ramus_api.shared.presentation.schemas import ApiRequest, ApiResponse
 
@@ -21,6 +22,10 @@ class Project(ApiResponse):
 
 class ProjectList(ApiResponse):
     items: list[Project]
+
+
+class ProjectParticipants(ApiResponse):
+    items: list[Account]
 
 
 class CreateProjectRequest(ApiRequest):

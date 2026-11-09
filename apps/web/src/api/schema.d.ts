@@ -316,6 +316,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/participants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Participants */
+        get: operations["listProjectParticipants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_id}/resources": {
         parameters: {
             query?: never;
@@ -960,6 +977,11 @@ export interface components {
         ProjectList: {
             /** Items */
             items: components["schemas"]["Project"][];
+        };
+        /** ProjectParticipants */
+        ProjectParticipants: {
+            /** Items */
+            items: components["schemas"]["Account"][];
         };
         /** ProjectResultList */
         ProjectResultList: {
@@ -2380,6 +2402,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectGraph"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listProjectParticipants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectParticipants"];
                 };
             };
             /** @description Client error */

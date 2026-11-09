@@ -7,9 +7,12 @@ from sqlalchemy.orm import Session
 from ramus_api.container import AppContainer
 from ramus_api.modules.access.application.login import RequestEmailCode, VerifyEmailCode
 from ramus_api.modules.access.application.ports import SharedProjectProvider
+from ramus_api.modules.access.application.rate_limits import AuthRateLimiter
 from ramus_api.modules.access.application.sessions import Authenticator, ProfileReader, SessionIssuer
+from ramus_api.modules.access.infrastructure.rate_limits import SqlAttemptStore
 from ramus_api.modules.access.infrastructure.stores import SqlAccountStore, SqlEmailCodeStore, SqlSessionStore
 from ramus_api.modules.access.infrastructure.system import SystemClock, SystemSecretSource
+from ramus_api.shared.application.identity import SessionAuthenticator
 from ramus_api.shared.infrastructure import Database
 
 
@@ -17,7 +20,7 @@ from ramus_api.shared.infrastructure import Database
 class AccessServices:
     request_email_code: RequestEmailCode[Session]
     verify_email_code: VerifyEmailCode[Session]
-    authenticator: Authenticator[Session]
+    authenticator: SessionAuthenticator
     profiles: ProfileReader[Session]
 
 
@@ -31,13 +34,17 @@ def build_access_services(
     database = container.database
     clock, secrets = SystemClock(), SystemSecretSource()
     codes, accounts, sessions = SqlEmailCodeStore(), SqlAccountStore(), SqlSessionStore()
-    profiles = ProfileReader(database.transaction, accounts, shared_project)
+    profiles = ProfileReader(database.transaction, accounts, shared_project, sessions, clock)
+    secret = container.settings.auth_secret.get_secret_value()
+    limits = AuthRateLimiter(database.transaction, SqlAttemptStore(), clock, secret)
     issuer = SessionIssuer(database.transaction, sessions, profiles, clock, secrets)
     return AccessServices(
-        request_email_code=RequestEmailCode(container.idempotency, codes, container.mailer, clock, secrets),
-        verify_email_code=VerifyEmailCode(
-            container.idempotency, codes, accounts, shared_project, issuer, clock
+        request_email_code=RequestEmailCode(
+            container.idempotency, codes, container.mailer, clock, secrets, limits, secret
         ),
-        authenticator=Authenticator(database.transaction, sessions, clock),
+        verify_email_code=VerifyEmailCode(
+            container.idempotency, codes, accounts, shared_project, issuer, clock, limits, secret
+        ),
+        authenticator=container.authenticator,
         profiles=profiles,
     )

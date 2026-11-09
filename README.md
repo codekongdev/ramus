@@ -58,10 +58,15 @@ API는 `uv run --project apps/api python -m ramus_api`, 웹은 `pnpm --filter @r
 
 개발 환경에서는 메일을 보내지 않는다. 로그인 인증 코드는 API 서버 터미널 로그에 `[DEV MAIL - not sent]` 줄로 출력된다.
 HTTPS로 서비스하는 환경에서는 `RAMUS_COOKIE_SECURE=true`로 세션 쿠키에 `Secure`를 붙인다.
+배포 환경에서는 `RAMUS_AUTH_SECRET`에 32자 이상의 고정 비밀값을 설정한다. 인증 코드와 로그인 receipt의 HMAC에 사용하며, 비워 두면 개발 서버를 다시 시작할 때마다 임시값이 바뀌어 발급 중인 코드와 재시도 receipt가 무효화된다.
 
 테스트(`uv run --project apps/api pytest`)는 `DATABASE_URL`의 개발용 DB를 쓰지 않는다.
 같은 서버에 `ramus_test_<무작위>` 임시 DB를 매번 만들어 마이그레이션하고, 끝나면 지운다.
 Postgres가 꺼져 있으면 통합 테스트는 실패한다. 단위 테스트만 돌릴 때는 `-m "not integration"`을 붙인다.
+
+로그인 브라우저 테스트는 `pnpm test:e2e`로 실행한다. 처음 실행할 때는 `pnpm exec playwright install chromium`으로 브라우저를 설치한다.
+테스트가 임시 DB를 만들고 마이그레이션한 뒤 API·웹 서버를 빈 포트에서 실행하며, 종료 시 서버와 임시 DB를 정리한다.
+개발 메일러가 출력한 코드를 fixture 내부에서만 읽고 실제 메일은 보내지 않는다. 재전송 테스트는 실제 60초 제한이 끝날 때까지 기다린다.
 
 ## 전체 검증
 
