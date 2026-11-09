@@ -132,10 +132,13 @@ class LlmRequest:
     credential_account_id: UUID
     context: ConversationContext = field(default_factory=ConversationContext)
     is_child: bool = False
+    message_from_seq: int | None = None
+    message_to_seq: int | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "purpose", RunPurpose(self.purpose))
         object.__setattr__(self, "messages", tuple(self.messages))
+        RunInputSnapshot(self.message_from_seq, self.message_to_seq)
 
 
 class LlmFailure(Exception):

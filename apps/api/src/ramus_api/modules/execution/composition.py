@@ -1,9 +1,10 @@
 """Wires the executor's services from SQL adapters and injected ports. The app lifespan calls this later."""
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from ramus_api.modules.execution.application.branch_ports import TaskLifecycle
 from ramus_api.modules.execution.application.config import Clock, ExecutorConfig
 from ramus_api.modules.execution.application.control import RunControlService
 from ramus_api.modules.execution.application.events import RunAnnouncer
@@ -52,15 +53,19 @@ def build_execution_runtime(
     gateway: LlmGateway,
     context_provider: ContextProvider[Any],
     connections: AiConnectionQuery[Any],
-    handlers: Iterable[RunPurposeHandler[Any]],
+    handlers: Iterable[RunPurposeHandler[Any]] = (),
+    handler_factory: Callable[[RunRegistrationService], Iterable[RunPurposeHandler[Any]]] | None = None,
+    task_lifecycle: TaskLifecycle[Any] | None = None,
     config: ExecutorConfig | None = None,
     clock: Clock = utc_now,
 ) -> ExecutionRuntime:
     config = config or ExecutorConfig()
     store, hooks = SqlRunStore(), SqlAlchemyTransactionHooks()
     relay, wakeup, inflight = EventRelay(publisher), LoopSignal(), InFlightCalls()
-    handlers_by_purpose = handler_map(handlers)
-    announcer = RunAnnouncer(hooks, relay, clock, wakeup)
+    announcer = RunAnnouncer(hooks, relay, clock, wakeup, task_lifecycle)
+    requester = RunRegistrationService(store, connections, announcer)
+    generated = handler_factory(requester) if handler_factory is not None else ()
+    handlers_by_purpose = handler_map((*handlers, *generated))
     finisher = RunFinisher(
         transaction=transaction,
         store=store,
@@ -98,4 +103,4 @@ def build_execution_runtime(
         inflight=inflight,
         clock=clock,
     )
-    return ExecutionRuntime(RunRegistrationService(store, connections, announcer), control, worker, relay)
+    return ExecutionRuntime(requester, control, worker, relay)

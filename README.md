@@ -4,6 +4,7 @@
 
 - [CONVENTIONS.md](CONVENTIONS.md): 아키텍처와 공통 구현 규칙
 - [AGENTS.md](AGENTS.md): 에이전트 작업 규칙
+- [A5 자동 분기 연결](docs/a5-auto-branch.md): work 실행기 조립, 입력 범위·버전 상속, 로컬 검증
 - `apps/web/`: React · TypeScript · Vite · Vitest 설정
 - `apps/api/`: Python · FastAPI · Ruff · pytest 설정
 - `compose.yaml`: 로컬 PostgreSQL 설정

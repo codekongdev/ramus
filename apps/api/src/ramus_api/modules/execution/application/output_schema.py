@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from ramus_api.modules.execution.domain.models import LlmFailure, LlmRequest, RunPurpose
 
@@ -15,6 +15,18 @@ Title = Annotated[str, Field(min_length=1, max_length=100)]
 
 class OutputDto(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, str_strip_whitespace=True)
+
+    @field_validator("*", check_fields=False)
+    @classmethod
+    def validate_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            if "\x00" in value:
+                raise ValueError("Text must not contain NUL")
+            try:
+                value.encode("utf-8")
+            except UnicodeEncodeError:
+                raise ValueError("Text must be valid UTF-8") from None
+        return value
 
 
 class BranchTaskOutput(OutputDto):
@@ -32,6 +44,10 @@ class ParentWorkOutput(OutputDto):
     def validate_tasks(self) -> "ParentWorkOutput":
         if (self.mode == "branch") != bool(self.tasks):
             raise ValueError("Only branch output has one to four tasks")
+        for field in ("goal", "start_input"):
+            values = [" ".join(getattr(task, field).split()).casefold() for task in self.tasks]
+            if len(set(values)) != len(values):
+                raise ValueError("Branch tasks must have distinct goals and starting inputs")
         return self
 
 
