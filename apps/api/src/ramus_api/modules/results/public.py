@@ -5,12 +5,16 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ramus_api.modules.results.application.approved import ApprovedConclusion as ApprovedConclusion
 from ramus_api.modules.results.domain.records import ResultRecord, Revision
+from ramus_api.modules.results.infrastructure.approved import (
+    SqlApprovedConclusionReader as SqlApprovedConclusionReader,
+)
 from ramus_api.modules.results.infrastructure.models import ResultRow
 from ramus_api.modules.results.infrastructure.repository import SqlResultRepository
 from ramus_api.modules.results.infrastructure.sample import SampleResults as SampleResults
 
-__all__ = ["ResultReader", "ResultRecord", "Revision", "SampleResults"]
+__all__ = ["ApprovedConclusion", "ResultReader", "ResultRecord", "Revision", "SampleResults", "SqlApprovedConclusionReader"]
 
 
 class ResultReader:

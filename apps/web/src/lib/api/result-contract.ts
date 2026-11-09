@@ -5,6 +5,7 @@ import type { components } from '../../api/schema';
 type Schemas = components['schemas'];
 export type Result = Schemas['Result'];
 export type ResultRevision = Schemas['ResultRevision'];
+export type ConclusionRevision = Pick<ResultRevision, 'id' | 'result_id' | 'version' | 'title' | 'conclusion' | 'source'>;
 type Parser<T> = (value: unknown) => T;
 type Shape<T> = { [K in keyof T]-?: Parser<T[K]> };
 const invalid = (): never => { throw new Error('Invalid result API response'); };

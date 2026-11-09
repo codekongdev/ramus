@@ -1,6 +1,6 @@
 import type { ProjectEvent } from '../../lib/events';
 import { next, type Next } from '../../lib/mvi';
-import type { ResultRevision } from '../../lib/api/result-contract';
+import type { ConclusionRevision } from '../../lib/api/result-contract';
 import type { ConversationInput } from './contract';
 
 export type ReceivedState = {
@@ -35,10 +35,10 @@ export function receivedReducer(state: ReceivedState, intent: ReceivedIntent): N
     }
   }
 }
-export type RevisionState = { readonly input: ConversationInput; readonly revision: ResultRevision | null; readonly loading: boolean; readonly error: string | null; readonly request: number };
+export type RevisionState = { readonly input: ConversationInput; readonly revision: ConclusionRevision | null; readonly loading: boolean; readonly error: string | null; readonly request: number };
 export type RevisionEffect = { readonly type: 'load'; readonly input: ConversationInput; readonly request: number };
 export type RevisionIntent = { readonly type: 'refresh' }
-  | { readonly type: 'loaded'; readonly request: number; readonly revision: ResultRevision }
+  | { readonly type: 'loaded'; readonly request: number; readonly revision: ConclusionRevision }
   | { readonly type: 'failed'; readonly request: number; readonly message: string };
 export const initialRevisionState = (input: ConversationInput): RevisionState => ({ input, revision: null, loading: false, error: null, request: 0 });
 export function revisionReducer(state: RevisionState, intent: RevisionIntent): Next<RevisionState, RevisionEffect> {

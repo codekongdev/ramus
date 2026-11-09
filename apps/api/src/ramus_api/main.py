@@ -91,7 +91,7 @@ MODULES: tuple[ModuleRegistrar, ...] = (
     register_realtime,
     register_resources,
     register_results,
-    register_sharing,
+    partial(register_sharing, memberships=MembershipReader(SqlAccountStore())),
 )
 
 

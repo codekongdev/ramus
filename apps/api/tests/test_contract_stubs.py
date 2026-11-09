@@ -27,7 +27,7 @@ IMPLEMENTED = frozenset({
     "getResource", "createResourceRevision",
     "listConversationTasks", "getTask",
     "createTaskSummary", "getResult", "getResultRevision", "saveResultRevision", "listProjectResults",
-    "shareResultRevision", "listConversationInputs",
+    "shareResultRevision", "listConversationInputs", "createConversationFromResult", "getConversationInput",
 })
 STUBS = tuple(e for e in CONTRACT_ENDPOINTS if e.operation_id not in IMPLEMENTED)
 

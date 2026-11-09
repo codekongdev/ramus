@@ -1,18 +1,21 @@
-"""Authenticated conclusion sharing; new-conversation creation is the B7 extension point."""
+"""Authenticated conclusion sharing, pinned input reads, and result-based follow-up conversations."""
 
 from dataclasses import asdict
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, FastAPI
+from sqlalchemy.orm import Session
 
 from ramus_api.container import AppContainer
-from ramus_api.modules.access.presentation.current_account import AuthenticatedAccount, require_account
+from ramus_api.modules.access.public import AuthenticatedAccount, MembershipReader, require_account
 from ramus_api.modules.conversations.composition import CommittedEvents
 from ramus_api.modules.conversations.presentation.dto import Conversation
-from ramus_api.modules.conversations.public import ConversationReader
-from ramus_api.modules.results.public import ResultReader
+from ramus_api.modules.conversations.public import ConversationReader, SqlFollowupConversations
+from ramus_api.modules.results.public import ResultReader, SqlApprovedConclusionReader
+from ramus_api.modules.sharing.application.followups import FollowupService
 from ramus_api.modules.sharing.application.service import SharingService
+from ramus_api.modules.sharing.infrastructure.inputs import SqlConversationInputs
 from ramus_api.modules.sharing.infrastructure.repository import SqlSharingRepository
 from ramus_api.modules.sharing.presentation.dto import (
     ConversationInputDetail,
@@ -21,16 +24,21 @@ from ramus_api.modules.sharing.presentation.dto import (
     ShareOutcomeList,
     ShareResultRevisionRequest,
 )
-from ramus_api.shared.presentation.error_messages import not_implemented
 from ramus_api.shared.presentation.idempotency import IdempotencyKey
 
 
-def register(app: FastAPI, container: AppContainer) -> None:
+def register(
+    app: FastAPI, container: AppContainer, *, memberships: MembershipReader[Session],
+) -> None:
     router = APIRouter(prefix="/api", tags=["sharing"])
     CurrentAccount = Annotated[AuthenticatedAccount, Depends(require_account(container))]
-    service = SharingService(
+    sharing = SharingService(
         SqlSharingRepository(), ResultReader(), ConversationReader(), container.project_access,
         CommittedEvents(container),
+    )
+    followups = FollowupService(
+        container.database.transaction, memberships, SqlFollowupConversations(),
+        SqlApprovedConclusionReader(), SqlConversationInputs(), container.idempotency, CommittedEvents(container),
     )
 
     @router.post(
@@ -45,11 +53,11 @@ def register(app: FastAPI, container: AppContainer) -> None:
         targets = tuple(body.conversation_ids)
         # A receipt must not grant access after source or target membership is revoked.
         with container.database.transaction() as session:
-            service.require_send_access(session, account.account_id, result_revision_id, targets)
+            sharing.require_send_access(session, account.account_id, result_revision_id, targets)
         return container.idempotency.execute_once(
             str(account.account_id), f"sharing.send:{result_revision_id}", idempotency_key,
             body.model_dump(mode="json"),
-            lambda session: ShareOutcomeList(items=[asdict(item) for item in service.send(
+            lambda session: ShareOutcomeList(items=[asdict(item) for item in sharing.send(
                 session, account.account_id, result_revision_id, targets,
             )]).model_dump(mode="json"),
         )
@@ -60,19 +68,15 @@ def register(app: FastAPI, container: AppContainer) -> None:
         operation_id="listConversationInputs",
     )
     def list_conversation_inputs(conversation_id: UUID, account: CurrentAccount):
-        with container.database.transaction() as session:
-            return ConversationInputList(items=[
-                {**asdict(item.pinned), "latest_version": item.latest_version}
-                for item in service.received(session, account.account_id, conversation_id)
-            ])
+        return followups.list_inputs(conversation_id, account.account_id)
 
     @router.get(
         "/conversations/{conversation_id}/inputs/{input_id}",
         response_model=ConversationInputDetail,
         operation_id="getConversationInput",
     )
-    def get_conversation_input(conversation_id: UUID, input_id: UUID):
-        raise not_implemented()
+    def get_conversation_input(conversation_id: UUID, input_id: UUID, account: CurrentAccount):
+        return followups.input_detail(conversation_id, input_id, account.account_id)
 
     @router.post(
         "/projects/{project_id}/conversations/from-result",
@@ -80,8 +84,9 @@ def register(app: FastAPI, container: AppContainer) -> None:
         operation_id="createConversationFromResult",
     )
     def create_conversation_from_result(
-        project_id: UUID, body: CreateConversationFromResultRequest, idempotency_key: IdempotencyKey
+        project_id: UUID, body: CreateConversationFromResultRequest, idempotency_key: IdempotencyKey,
+        account: CurrentAccount,
     ):
-        raise not_implemented()
+        return followups.create(project_id, account.account_id, body.result_revision_id, body.title, idempotency_key)
 
     app.include_router(router)
