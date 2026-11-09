@@ -1,0 +1,16 @@
+.project-switcher-trigger { display: flex; align-items: center; gap: 12px; min-height: 44px; max-width: min(32vw, 420px); }
+.project-switcher-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+.project-switcher-trigger svg { flex-shrink: 0; }
+.ramus.projects-dialog { width: min(480px, calc(100vw - 32px)); }
+.projects-list-view, .projects-form { display: grid; gap: 20px; }
+.projects-field { display: grid; gap: 8px; }
+.projects-field input { min-height: 44px; }
+.projects-list { list-style: none; margin: 0; padding: 0; max-height: min(45dvh, 360px); overflow: auto; }
+.ramus .projects-option { display: flex; justify-content: space-between; align-items: center; gap: 16px; width: 100%; min-height: 48px; height: auto; text-align: left; }
+.ramus .projects-option[aria-current="true"] { background: var(--muted); }
+.projects-option-name { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
+.projects-option-meta { flex-shrink: 0; color: var(--muted-foreground); font-size: 12px; }
+.projects-new { min-height: 44px; }
+.projects-hint { margin: 0; font-size: 13px; color: var(--muted-foreground); }
+.projects-error { margin: 0; font-size: 14px; color: var(--destructive); line-height: 1.6; }
+.projects-form-actions { display: flex; justify-content: flex-end; gap: 8px; }

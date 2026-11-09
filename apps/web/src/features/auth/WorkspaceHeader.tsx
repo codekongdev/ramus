@@ -4,6 +4,7 @@ import { DEFAULT_LOCALE } from '../../lib/locale';
 import { api, newIdempotencyKey } from '../../lib/api';
 import { useStore } from '../../lib/mvi';
 import { Avatar, Button } from '../../ui';
+import { ProjectSwitcher } from '../projects';
 import { useAuth } from './AuthProvider';
 import { authMessages as m } from './messages';
 import { initialParticipantsState, makeParticipantsEffects, participantsReducer } from './participants';
@@ -22,7 +23,7 @@ export function useWorkspaceHeader(projectId: string) {
   useEffect(() => { if (state.unauthorized) dispatchAuth({ type: 'sessionExpired' }); }, [state.unauthorized, dispatchAuth]);
   const account = auth.me?.account;
   return {
-    project: <div className="auth-project-name">{state.project?.name ?? (state.loading ? m.projectLoading : m.projectUnavailable)}</div>,
+    project: <ProjectSwitcher projectId={projectId} projectName={state.projectId === projectId && state.project ? state.project.name : state.loading ? m.projectLoading : m.projectUnavailable} />,
     participants: <div className="auth-participants">
       {state.error && <div className="auth-error" role="alert">{state.error}<Button variant="ghost" onClick={() => dispatch({ type: 'load', projectId })}>{m.retry}</Button></div>}
       {state.projectId === projectId && <details>
