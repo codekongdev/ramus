@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { task as initialTask, conversation, parent, message as initialMessage, me, createdAt } from '../../apps/web/tests/fixtures/tasks';
 
 async function fixture(page: Page, accountId = 'u1', connected = true) {
@@ -142,9 +143,9 @@ test('a keyless task request retains its draft on cancel and resumes exactly onc
   await expect(page.locator('dialog[open]')).toHaveCount(1);
 });
 
-test('requester can stop and retry; another member can read and discuss without controlling the run', async ({ browser }) => {
-  const owner = await browser.newPage();
-  const viewer = await browser.newPage();
+test('requester can stop and retry; another member can read and discuss without controlling the run', async ({ browser, testServer }) => {
+  const owner = await browser.newPage({ baseURL: testServer.url });
+  const viewer = await browser.newPage({ baseURL: testServer.url });
   try {
     const ownerFixture = await fixture(owner);
     const viewerFixture = await fixture(viewer, 'u2');

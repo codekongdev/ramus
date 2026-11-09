@@ -58,8 +58,13 @@ def app(unit_settings: Settings) -> FastAPI:
 
 @pytest.fixture
 def client(app: FastAPI) -> Iterator[TestClient]:
-    with TestClient(app, raise_server_exceptions=False) as instance:
+    # Router-only tests must not start the database-backed execution worker.
+    instance = TestClient(app, raise_server_exceptions=False)
+    try:
         yield instance
+    finally:
+        instance.close()
+        app.state.container.database.dispose()
 
 
 def assert_envelope(body: dict, code: str) -> dict:

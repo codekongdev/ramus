@@ -34,7 +34,12 @@ def test_three_accounts_see_the_same_project_and_participants(fresh_database_url
     mailer = FakeMailer()
     app = create_app(Settings(_env_file=None, database_url=fresh_database_url), mailer=mailer)
     with ExitStack() as stack:
-        clients = [stack.enter_context(TestClient(app)) for _ in range(3)]
+        # Share one server lifespan while keeping three independent sessions.
+        clients = [stack.enter_context(TestClient(app))]
+        for _ in range(2):
+            client = TestClient(app)
+            stack.callback(client.close)
+            clients.append(client)
         profiles = [login(client, mailer, unique_email("participant")).json() for client in clients]
         project_id = profiles[0]["default_project_id"]
         expected = {profile["account"]["id"]: profile["account"] for profile in profiles}

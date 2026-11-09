@@ -101,7 +101,12 @@ def test_three_accounts_join_the_same_shared_project(migrated_fresh_url: str) ->
     app = create_app(Settings(_env_file=None, database_url=migrated_fresh_url), mailer=mailer)
     emails = [unique_email(name) for name in ("ana", "ben", "cho")]
     with ExitStack() as stack:
-        clients = [stack.enter_context(TestClient(app)) for _ in emails]
+        # One application has one lifespan; each account still has its own cookie jar.
+        clients = [stack.enter_context(TestClient(app))]
+        for _ in emails[1:]:
+            client = TestClient(app)
+            stack.callback(client.close)
+            clients.append(client)
         verified = [login(c, mailer, email).json() for c, email in zip(clients, emails, strict=True)]
         assert {me["default_project_id"] for me in verified} == {str(SHARED_SAMPLE_PROJECT_ID)}
         for client, email, me in zip(clients, emails, verified, strict=True):
@@ -121,7 +126,11 @@ def test_concurrent_first_logins_create_one_project_and_one_membership_each(migr
     app = create_app(Settings(_env_file=None, database_url=migrated_fresh_url), mailer=mailer)
     emails = [unique_email(f"racer{n}") for n in range(6)]
     with ExitStack() as stack:
-        clients = [stack.enter_context(TestClient(app)) for _ in emails]
+        clients = [stack.enter_context(TestClient(app))]
+        for _ in emails[1:]:
+            client = TestClient(app)
+            stack.callback(client.close)
+            clients.append(client)
         for client, email in zip(clients, emails, strict=True):
             assert request_code(client, email).status_code == 202
         jobs = [(c, e, latest_code(mailer, e)) for c, e in zip(clients, emails, strict=True)]

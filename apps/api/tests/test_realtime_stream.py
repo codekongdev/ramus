@@ -153,8 +153,14 @@ async def test_response_header_disconnect_closes_subscription_before_iteration()
 
 
 def test_anonymous_stream_is_401_without_database_access(unit_settings: Settings) -> None:
-    with TestClient(create_app(unit_settings)) as client:
+    # Do not start lifespan: this test covers authentication before any DB access.
+    app = create_app(unit_settings)
+    client = TestClient(app)
+    try:
         response = client.get(f"/api/projects/{PROJECT}/events")
+    finally:
+        client.close()
+        app.state.container.database.dispose()
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "UNAUTHORIZED"
 

@@ -6,6 +6,7 @@ from uuid import uuid4
 import httpx
 import pytest
 
+from ramus_api.modules.access.public import AccessRejected
 from ramus_api.modules.execution.domain.models import LlmFailure, LlmMessage, LlmRequest, RunPurpose
 from ramus_api.modules.execution.infrastructure.summary_gateway import OpenAiGateway
 
@@ -21,7 +22,7 @@ class Credentials:
 
 def response(raw='{"conclusion":"검토할 결론"}', **values):
     return {"status": "completed", "error": None, "output": [{
-        "type": "message", "role": "assistant", "content": [{"type": "output_text", "text": raw}],
+        "type": "message", "role": "assistant", "status": "completed", "content": [{"type": "output_text", "text": raw}],
     }], **values}
 
 
@@ -86,13 +87,13 @@ async def test_provider_errors_are_sanitized(status, code):
 async def test_incomplete_output_never_becomes_an_approved_draft():
     with pytest.raises(LlmFailure) as caught:
         await gateway(lambda _: httpx.Response(200, json=response(status="incomplete"))).complete(request())
-    assert caught.value.code == "LLM_UNAVAILABLE"
+    assert caught.value.code == "LLM_OUTPUT_INVALID"
 
 
 async def test_missing_credentials_never_send_an_http_request():
     class MissingCredentials:
         def get_api_key(self, _account):
-            raise ValueError("private credential failure")
+            raise AccessRejected("AI_CONNECTION_REQUIRED")
 
     def unexpected(_):
         pytest.fail("A keyless request must never reach the provider")
