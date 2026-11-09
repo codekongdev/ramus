@@ -22,3 +22,6 @@ class ConversationReader:
 
     def get_conversation(self, session: Session, conversation_id: UUID) -> ConversationRecord | None:
         return self._repository.get_conversation(session, conversation_id)
+
+    def list_conversations(self, session: Session, project_id: UUID) -> tuple[ConversationRecord, ...]:
+        return self._repository.list_conversations(session, project_id)

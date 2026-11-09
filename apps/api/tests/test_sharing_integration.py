@@ -285,3 +285,66 @@ async def test_next_ai_uses_the_sent_snapshot_and_records_the_same_revision(shar
     assert [item.result_revision_id for item in request.context.results] == [fixture.revision_ids[0]]
     assert request.context.results[0].conclusion == "검토한 결론 버전 1"
     assert stored_run["input_snapshot"]["input_result_revision_ids"] == [str(fixture.revision_ids[0])]
+
+
+def test_project_graph_reflects_branches_task_status_and_pinned_usage(sharing_fixture, database):
+    fixture = sharing_fixture
+    path = f"/api/projects/{fixture.project_id}/graph"
+    before = fixture.owner.get(path)
+    assert before.status_code == 200
+    graph = before.json()
+    nodes = {node["conversation_id"]: node for node in graph["nodes"]}
+    source = nodes[str(fixture.source_id)]
+    assert source["task_status"] == "ready"
+    assert source["parent_id"] in nodes
+    assert graph["edges"] == [{"kind": "branch", "from": source["parent_id"], "to": str(fixture.source_id)}]
+    assert fixture.outsider.get(path).status_code == 404
+    assert fixture.owner.get(f"/api/projects/{uuid4()}/graph").status_code == 404
+    anonymous = TestClient(fixture.app)
+    try:
+        assert anonymous.get(path).status_code == 401
+    finally:
+        anonymous.close()
+
+    assert fixture.send().status_code == 200
+    assert fixture.send(2).status_code == 200
+    graph = fixture.owner.get(path).json()
+    uses = [edge for edge in graph["edges"] if edge["kind"] == "uses_result"]
+    assert {edge["to"] for edge in uses} == {str(target) for target in fixture.target_ids}
+    assert all(edge["from"] == str(fixture.source_id) for edge in uses)
+    assert len(uses) == 2  # resending a different revision does not duplicate a relationship
+
+    followup = fixture.owner.post(
+        f"/api/projects/{fixture.project_id}/conversations/from-result",
+        json={"result_revision_id": str(fixture.revision_ids[0]), "title": "후속 대화"}, headers=new_key(),
+    )
+    assert followup.status_code == 200, followup.text
+    followup_id = followup.json()["id"]
+    graph = fixture.owner.get(path).json()
+    assert {"kind": "uses_result", "from": str(fixture.source_id), "to": followup_id} in graph["edges"]
+    assert next(node for node in graph["nodes"] if node["conversation_id"] == followup_id)["parent_id"] is None
+
+    with database.transaction() as session:
+        other_project = session.scalar(select(metadata.tables["conversation"].c.project_id).where(
+            metadata.tables["conversation"].c.id == fixture.other_project_target,
+        ))
+    cross_project = fixture.owner.post(
+        f"/api/projects/{other_project}/conversations/from-result",
+        json={"result_revision_id": str(fixture.revision_ids[0]), "title": "다른 프로젝트 대화"},
+        headers=new_key(),
+    )
+    assert cross_project.status_code == 200, cross_project.text
+    other_graph = fixture.owner.get(f"/api/projects/{other_project}/graph").json()
+    assert all(edge["from"] != str(fixture.source_id) for edge in other_graph["edges"])
+
+    with database.transaction() as session:
+        session.execute(metadata.tables["task"].update().where(
+            metadata.tables["task"].c.child_conversation_id == fixture.source_id,
+        ).values(status="failed"))
+        session.execute(delete(metadata.tables["membership"]).where(
+            metadata.tables["membership"].c.project_id == fixture.project_id,
+            metadata.tables["membership"].c.account_id == fixture.actor_id,
+        ))
+    assert fixture.owner.get(path).status_code == 404
+    refreshed = fixture.editor.get(path).json()
+    assert next(node for node in refreshed["nodes"] if node["conversation_id"] == str(fixture.source_id))["task_status"] == "failed"
