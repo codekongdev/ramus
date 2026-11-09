@@ -3,6 +3,7 @@ import { useCallback, useEffect, type ReactNode } from 'react';
 import { TaskConversationTree } from '../../features/task-navigation';
 import { TaskQueue } from '../../features/task-queue';
 import { TaskModal } from '../../features/task-modal';
+import { Conversation } from '../../features/conversation';
 import type { Task } from '../../lib/api/task-contract';
 import { AppShell, type AppShellSlots } from '../layout/AppShell';
 import { useModalHost } from '../modal/ModalHost';
@@ -27,6 +28,8 @@ export function WorkspacePage({
   renderTaskResultTab = noResult, ensureAiConnection,
 }: WorkspacePageProps) {
   const header = useWorkspaceHeader(projectId);
+  const selectConversation = useCallback((id: string) => navigate({ name: 'workspace', projectId, conversationId: id }), [projectId]);
+  const selectInitialConversation = useCallback((id: string) => navigate({ name: 'workspace', projectId, conversationId: id }, { replace: true }), [projectId]);
   const { openModal, closeModal } = useModalHost();
   useEffect(() => () => closeModal(), [projectId, conversationId, closeModal]);
   const openTask = useCallback((taskId: string) => {
@@ -38,8 +41,9 @@ export function WorkspacePage({
     });
   }, [openModal, renderTaskHeaderActions, renderTaskResultTab, ensureAiConnection]);
   return <AppShell project={header.project} participants={header.participants} {...slots}
+    conversation={slots?.conversation ?? <Conversation projectId={projectId} conversationId={conversationId} ensureAiConnection={ensureAiConnection} />}
     conversationTree={projectId && <TaskConversationTree projectId={projectId} conversationId={conversationId}
-      onSelectConversation={(id) => navigate({ name: 'workspace', projectId, conversationId: id })}
+      onSelectConversation={selectConversation} onInitialConversation={selectInitialConversation}
       onOpenTask={openTask} />}
     taskQueue={projectId && conversationId && <TaskQueue conversationId={conversationId} onOpenTask={openTask} />}
   />;

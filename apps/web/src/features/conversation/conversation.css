@@ -1,0 +1,16 @@
+.conversation { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.conversation__header { padding: calc(var(--spacing) * 5) calc(var(--spacing) * 6); border-bottom: var(--hairline) solid var(--border); }
+.conversation__header h1, .conversation__empty h1 { margin: 0; font-size: var(--text-lg); font-weight: var(--font-weight-semibold); line-height: var(--text-lg--line-height); overflow-wrap: anywhere; }
+.conversation__messages { flex: 1; min-height: 0; overflow-y: auto; padding: calc(var(--spacing) * 6); display: flex; flex-direction: column; gap: calc(var(--spacing) * 5); scrollbar-gutter: stable; }
+.conversation__messages:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.conversation__body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.conversation__badges { display: flex; gap: calc(var(--spacing) * 2); }
+.conversation__badges:empty { display: none; }
+.conversation__empty { display: flex; flex: 1; flex-direction: column; align-items: flex-start; justify-content: center; gap: calc(var(--spacing) * 3); padding: calc(var(--spacing) * 6); color: var(--muted-foreground); }
+.conversation__empty p, .conversation__notice p { margin: 0; line-height: var(--text-sm--line-height); }
+.conversation__notice { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--spacing) * 3); margin: 0; padding: calc(var(--spacing) * 3) calc(var(--spacing) * 6); background: var(--muted); font-size: var(--text-sm); }
+.conversation__composer { display: grid; gap: calc(var(--spacing) * 3); padding: calc(var(--spacing) * 4) calc(var(--spacing) * 6) calc(var(--spacing) * 6); border-top: var(--hairline) solid var(--border); }
+.conversation__composer textarea { min-height: calc(var(--spacing) * 24); max-height: calc(var(--spacing) * 48); resize: vertical; }
+.conversation__composer-actions { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--spacing) * 4); }
+.conversation__composer-actions p { margin: 0; color: var(--muted-foreground); font-size: var(--text-xs); line-height: var(--text-xs--line-height); }
+.conversation__send-error { margin: 0; color: var(--destructive); font-size: var(--text-sm); }
