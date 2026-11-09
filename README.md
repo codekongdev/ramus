@@ -58,3 +58,15 @@ API는 `uv run --project apps/api python -m ramus_api`, 웹은 `pnpm --filter @r
 테스트(`uv run --project apps/api pytest`)는 `DATABASE_URL`의 개발용 DB를 쓰지 않는다.
 같은 서버에 `ramus_test_<무작위>` 임시 DB를 매번 만들어 마이그레이션하고, 끝나면 지운다.
 Postgres가 꺼져 있으면 통합 테스트는 실패한다. 단위 테스트만 돌릴 때는 `-m "not integration"`을 붙인다.
+
+## 전체 검증
+
+```sh
+pnpm verify                     # 웹 타입·테스트, API lint·단위·통합, 계약 검사를 한 번에 실행
+pnpm verify --only web,api:lint # 영역(web·api·contract·scripts) 또는 단계 ID만 실행
+pnpm verify --list              # 단계 목록
+```
+
+실패한 단계가 있어도 나머지를 끝까지 실행하고 마지막에 단계별 PASS·FAIL·SKIP을 보여 준다.
+uv가 없거나 Postgres가 꺼져 있거나 계약 검사 스크립트가 아직 없으면 그 단계는 SKIP이다.
+SKIP은 통과가 아니므로 종료 코드 1을 돌려준다. 실행하지 못한 것을 알고 넘어갈 때만 `--allow-skip`을 붙인다.
