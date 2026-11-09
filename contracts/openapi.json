@@ -1802,9 +1802,16 @@
             "minLength": 1,
             "title": "Conclusion",
             "type": "string"
+          },
+          "source_run_id": {
+            "description": "Run that produced the draft or approved revision being edited.",
+            "format": "uuid",
+            "title": "Source Run Id",
+            "type": "string"
           }
         },
         "required": [
+          "source_run_id",
           "base_version",
           "conclusion"
         ],

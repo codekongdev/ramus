@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from ramus_api.container import AppContainer, ModuleRegistrar
 from ramus_api.modules.access.application.ports import AiKeyValidator, Mailer
-from ramus_api.modules.access.composition import build_authenticator
+from ramus_api.modules.access.composition import build_ai_connections, build_authenticator
 from ramus_api.modules.access.infrastructure.mailer import LoggingMailer
 from ramus_api.modules.access.infrastructure.openai_key_validator import OpenAiKeyValidator
 from ramus_api.modules.access.infrastructure.project_access import SqlAiConnectionQuery, SqlProjectAccess
@@ -25,6 +25,7 @@ from ramus_api.modules.access.presentation.routes import register as register_ac
 from ramus_api.modules.access.public import MembershipReader, MembershipWriter
 from ramus_api.modules.conversations.composition import CommittedEvents
 from ramus_api.modules.conversations.infrastructure.repository import SqlConversationRepository
+from ramus_api.modules.conversations.infrastructure.summary_inputs import SqlSummaryInputReader
 from ramus_api.modules.conversations.infrastructure.writer import SqlConversationWriter
 from ramus_api.modules.conversations.presentation.routes import register as register_conversations
 from ramus_api.modules.execution.application.events import RunAnnouncer
@@ -34,6 +35,7 @@ from ramus_api.modules.execution.application.relay import EventRelay
 from ramus_api.modules.execution.infrastructure.commit_hooks import SqlAlchemyTransactionHooks
 from ramus_api.modules.execution.infrastructure.queries import SqlRunReader
 from ramus_api.modules.execution.infrastructure.run_store import SqlRunStore
+from ramus_api.modules.execution.infrastructure.summary_gateway import OpenAiGateway
 from ramus_api.modules.execution.presentation.routes import register as register_execution
 from ramus_api.modules.execution.work_composition import build_work_execution_runtime
 from ramus_api.modules.projects.infrastructure.sample import (
@@ -45,6 +47,8 @@ from ramus_api.modules.realtime.infrastructure.broker import InProcessEventBroke
 from ramus_api.modules.realtime.presentation.routes import register as register_realtime
 from ramus_api.modules.resources.infrastructure.context_provider import build_context_provider
 from ramus_api.modules.resources.presentation.routes import register as register_resources
+from ramus_api.modules.results.application.summary import SummaryPurposeHandler
+from ramus_api.modules.results.infrastructure.repository import SqlResultRepository
 from ramus_api.modules.results.presentation.routes import register as register_results
 from ramus_api.modules.sharing.presentation.routes import register as register_sharing
 from ramus_api.modules.system.presentation.routes import register as register_system
@@ -85,6 +89,11 @@ MODULES: tuple[ModuleRegistrar, ...] = (
 )
 
 
+def default_gateway(container: AppContainer) -> LlmGateway | None:
+    """Production adapter boundary, replaceable with a deterministic gateway in tests."""
+    return OpenAiGateway(container.settings.openai_model, build_ai_connections(container))
+
+
 def build_container(
     settings: Settings,
     mailer: Mailer | None = None,
@@ -113,15 +122,17 @@ def build_container(
         run_reader=SqlRunReader(),
         ai_key_validator=ai_key_validator if ai_key_validator is not None else OpenAiKeyValidator(settings.openai_model),
     )
-    if llm_gateway is None:
+    gateway = llm_gateway if llm_gateway is not None else default_gateway(container)
+    if gateway is None:
         return container
     runtime = build_work_execution_runtime(
         transaction=database.transaction,
         publisher=events,
-        gateway=llm_gateway,
+        gateway=gateway,
         context_provider=build_context_provider(),
         connections=SqlAiConnectionQuery(),
         writer=SqlConversationWriter(SqlConversationRepository(), CommittedEvents(container)),
+        handlers=(SummaryPurposeHandler(SqlResultRepository(), SqlSummaryInputReader(), CommittedEvents(container)),),
     )
     return replace(container, run_requester=runtime.requester, execution_runtime=runtime)
 

@@ -150,7 +150,7 @@ class RunWorker:
                 request = handler.build_request(session, pinned.view, context)
                 if request.message_from_seq is not None:
                     pinned = self._deps.store.save_snapshot(
-                        session, state.id, state.attempt, snapshot_from_context(context, request)
+                        session, state.id, state.attempt, snapshot_from_context(request.context, request)
                     )
                     if pinned is None:
                         raise RuntimeError("Claimed run left running before its messages were pinned")

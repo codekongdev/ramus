@@ -1320,6 +1320,12 @@ export interface components {
             base_version: number;
             /** Conclusion */
             conclusion: string;
+            /**
+             * Source Run Id
+             * Format: uuid
+             * @description Run that produced the draft or approved revision being edited.
+             */
+            source_run_id: string;
         };
         /** ShareOutcomeList */
         ShareOutcomeList: {

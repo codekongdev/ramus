@@ -30,6 +30,14 @@ ADMIN_DATABASE = "postgres"
 AlembicRunner = Callable[..., subprocess.CompletedProcess[str]]
 
 
+@pytest.fixture(autouse=True)
+def no_implicit_model_worker(monkeypatch):
+    """Tests opt into execution by injecting FakeLLM; production credentials are never used."""
+    from ramus_api import main
+
+    monkeypatch.setattr(main, "default_gateway", lambda _container: None)
+
+
 def _render(url: URL) -> str:
     return url.render_as_string(hide_password=False)
 

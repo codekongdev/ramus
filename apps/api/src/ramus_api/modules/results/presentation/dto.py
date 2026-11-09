@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from ramus_api.shared.presentation.schemas import ApiRequest, ApiResponse, ErrorSummary
 
@@ -62,8 +62,20 @@ class ResultRevision(ApiResponse):
 
 
 class SaveResultRevisionRequest(ApiRequest):
+    source_run_id: UUID = Field(description="Run that produced the draft or approved revision being edited.")
     base_version: int = Field(ge=0, description="Version the edit started from; 0 when none exists.")
     conclusion: str = Field(min_length=1, max_length=MAX_CONCLUSION_LENGTH)
+
+    @field_validator("conclusion")
+    @classmethod
+    def validate_conclusion(cls, value: str) -> str:
+        if not value.strip() or "\x00" in value:
+            raise ValueError("Conclusion must contain valid nonblank text")
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError:
+            raise ValueError("Conclusion must be valid UTF-8") from None
+        return value
 
 
 class ProjectResultSummary(ApiResponse):
