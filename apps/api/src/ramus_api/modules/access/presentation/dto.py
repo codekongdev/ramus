@@ -1,17 +1,23 @@
 """Access DTOs (docs/contracts.md sections 2 and 3.1)."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import AfterValidator, Field
 
+from ramus_api.modules.access.domain.email import normalize_email
 from ramus_api.shared.presentation.schemas import ApiRequest, ApiResponse
 
 MAX_EMAIL_LENGTH = 254
 MAX_API_KEY_LENGTH = 512
 
 AiConnectionStatus = Literal["none", "connected", "invalid"]
+
+# Normalized (trimmed, lowercased) at the boundary; a malformed address is 422 INVALID_INPUT.
+EmailAddress = Annotated[
+    str, Field(min_length=3, max_length=MAX_EMAIL_LENGTH), AfterValidator(normalize_email)
+]
 
 
 class Account(ApiResponse):
@@ -39,7 +45,7 @@ class Me(ApiResponse):
 
 
 class RequestEmailCodeRequest(ApiRequest):
-    email: str = Field(min_length=3, max_length=MAX_EMAIL_LENGTH)
+    email: EmailAddress
 
 
 class RequestEmailCodeResponse(ApiResponse):
@@ -47,7 +53,7 @@ class RequestEmailCodeResponse(ApiResponse):
 
 
 class VerifyEmailCodeRequest(ApiRequest):
-    email: str = Field(min_length=3, max_length=MAX_EMAIL_LENGTH)
+    email: EmailAddress
     code: str = Field(pattern=r"^\d{6}$")
 
 

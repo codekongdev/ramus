@@ -29,3 +29,5 @@ class Settings(BaseSettings):
     database_url: str = DEFAULT_DATABASE_URL
     api_port: int = Field(default=DEFAULT_API_PORT, ge=MIN_PORT, le=MAX_PORT, validation_alias="RAMUS_API_PORT")
     web_port: int = Field(default=DEFAULT_WEB_PORT, ge=MIN_PORT, le=MAX_PORT, validation_alias="RAMUS_WEB_PORT")
+    # Adds ``Secure`` to the session cookie. Turn on wherever the app is served over HTTPS.
+    cookie_secure: bool = Field(default=False, validation_alias="RAMUS_COOKIE_SECURE")
