@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import DateTime, String, UniqueConstraint, Uuid, select
+from sqlalchemy import DateTime, String, UniqueConstraint, Uuid, delete, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Mapped, Session, mapped_column
@@ -37,6 +37,25 @@ class RequestReceiptRow(Base):
     fingerprint: Mapped[str] = mapped_column(String(64))
     response: Mapped[dict[str, Any]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+def forget_entity_receipts(session: Session, entity_ids: tuple[UUID, ...]) -> None:
+    """Invalidate only receipts referring to deleted entities during offline maintenance."""
+    identifiers = {str(identifier) for identifier in entity_ids}
+
+    def references(value: object) -> bool:
+        if isinstance(value, str):
+            return value in identifiers
+        if isinstance(value, dict):
+            return any(references(item) for item in value.values())
+        if isinstance(value, list):
+            return any(references(item) for item in value)
+        return False
+
+    stale = [row.id for row in session.scalars(select(RequestReceiptRow))
+             if any(part in identifiers for part in row.scope.split(":")) or references(row.response)]
+    if stale:
+        session.execute(delete(RequestReceiptRow).where(RequestReceiptRow.id.in_(stale)))
 
 
 class _ConcurrentReceipt(Exception):

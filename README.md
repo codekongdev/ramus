@@ -3,10 +3,11 @@
 Development conventions and environment setup.
 
 - [CONVENTIONS.md](CONVENTIONS.md): Architecture and shared implementation rules
-- [B2 resource revision management](docs/b2-resource-revisions.md): Resource history, editing, conflicts, and explicit version application
 - [AGENTS.md](AGENTS.md): Agent workflow rules
 - [A5 automatic branching integration](docs/a5-auto-branch.md): Work executor assembly, input scope and version inheritance, and local verification
+- [A8 project switching and creation](docs/a8-projects.md): Project access, idempotent creation, navigation, and local verification
 - [B1 shared skills and resources](docs/b1-resources-ui.md): Register, import, search, and apply pinned resource versions
+- [B2 resource revision management](docs/b2-resource-revisions.md): Resource history, editing, conflicts, and explicit version application
 - `apps/web/`: React · TypeScript · Vite · Vitest setup
 - `apps/api/`: Python · FastAPI · Ruff · pytest setup
 - `compose.yaml`: Local PostgreSQL configuration
@@ -47,16 +48,35 @@ uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
 ```
 
 The [schema contract](docs/contracts.md#5-테이블-스키마) is the source of truth for all tables, columns, and constraints.
-After applying migrations, initialize the shared sample project:
+After applying migrations, prepare the shared sample projects and fictional content:
 
 ```sh
 uv run --project apps/api python -m ramus_api.modules.seed
 ```
 
-This command derives a UUIDv5 from a fixed seed key and prints `project_id` as JSON.
-Repeated or concurrent runs create only one project and seed marker, preserving existing names and data.
-Sample conversations, resources, and result content will be added in later work.
-Users are automatically added to the shared sample project as editing participants when they sign in. The project is created on the first sign-in even if the seed command has not been run.
+The command prints `project_id` as JSON and uses stable UUIDv5 identities with a separate content version marker.
+On a fresh database, it creates two sample projects, four example authors, the unfinished “멤버십 기능 설계”
+assignment and three A/B/C research conversations, ten messages, three resources at v1, three saved conclusions,
+and three shares with pinned conclusion inputs. The three ready tasks and four succeeded runs are fictional historical
+examples; preparation does not call a model or add pending/running work.
+Repeated or concurrent preparation preserves existing content, user work, and project names.
+Sign-in adds editing memberships to the sample projects without preparing or resetting their content.
+Before preparation, sign-in creates only the default project, with no sample content or follow-up project.
+
+Reset is an operator-only CLI operation, authorized by server and database access. Stop the API and workers and confirm
+that existing work has been backed up or may be removed before running it:
+
+```sh
+uv run --project apps/api python -m ramus_api.modules.seed --reset \
+  --confirm-project-id 52ca4f3a-7913-510c-9e52-064b3f1db1a4 --work-preserved
+```
+
+Reset removes user-created content in both fixed sample projects and restores the examples. It preserves accounts,
+sessions, AI connections, memberships, project names, and unrelated projects. Active runs, conflicting database use,
+or another project's references to the sample conclusions prevent reset and roll back changes.
+There is no HTTP endpoint or product button for reset. See [B9 sample preparation](docs/b9-seed-content.md) for scope
+and local verification. Conclusion sharing, follow-up conversation creation, and the results library remain
+dependent on B5–B8 integration for the full product E2E.
 
 ## Conversation and message backend (A2)
 
@@ -72,6 +92,14 @@ The current broker runs within a single API process. Running multiple processes 
 Messages containing `@AI` are saved together with a registered run. If the requester has no AI connection or the same conversation
 already has an active run, the API returns 409 without saving the message. The app currently supports registering pending runs;
 actual model calls require wiring together the AI connection, input assembly, purpose-specific handlers, and worker.
+
+## Project switching and creation (A8)
+
+Use the project name in the top bar to search your projects, switch workspaces, or create a new project.
+Creation selects the new workspace and grants its creator editing access. Other accounts continue to join
+the shared sample on sign-in; they do not automatically join newly created projects.
+Project and conversation URLs survive reloads and browser history navigation. A creation retry after a lost
+response reuses its idempotency key, so it selects the already created project without creating a duplicate.
 
 ## Running the servers
 

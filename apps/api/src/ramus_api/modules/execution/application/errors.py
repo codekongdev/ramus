@@ -15,6 +15,7 @@ MESSAGES = {
     codes.LLM_UNAVAILABLE: "AI 요청을 처리하지 못했습니다. 다시 시도해 주세요.",
     codes.LLM_OUTPUT_INVALID: "AI 응답 형식이 올바르지 않습니다. 다시 시도해 주세요.",
     codes.LLM_TIMEOUT: "AI 응답이 제한 시간 안에 오지 않았습니다. 다시 시도해 주세요.",
+    codes.SUMMARY_LIMIT_EXCEEDED: "정리할 내용이 처리 한도를 넘었습니다. 자료를 줄이거나 작업을 나눠 다시 정리해 주세요.",
     codes.RUN_INTERRUPTED: "AI 실행이 중간에 끊겼습니다. 다시 시도해 주세요.",
     codes.RUN_TIMED_OUT: "AI 실행이 너무 오래 대기해 멈췄습니다. 다시 시도해 주세요.",
     codes.RUN_CREDENTIAL_MISMATCH: "요청한 계정의 AI 연결로만 실행할 수 있습니다.",

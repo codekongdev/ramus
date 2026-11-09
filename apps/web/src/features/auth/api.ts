@@ -8,7 +8,7 @@ const record = (value: unknown): value is Record<string, unknown> => typeof valu
 export const isAccount = (value: unknown): value is Account => record(value) && typeof value.id === 'string' && typeof value.email === 'string' && typeof value.display_name === 'string';
 const isMe = (value: unknown): value is Me => record(value) && isAccount(value.account) && typeof value.default_project_id === 'string' && record(value.ai_connection) && ['none', 'connected', 'invalid'].includes(String(value.ai_connection.status));
 const isCodeResponse = (value: unknown): value is components['schemas']['RequestEmailCodeResponse'] => record(value) && typeof value.resend_available_at === 'string' && Number.isFinite(Date.parse(value.resend_available_at));
-const isProject = (value: unknown): value is Project => record(value) && typeof value.id === 'string' && typeof value.name === 'string' && typeof value.is_shared_sample === 'boolean';
+export const isProject = (value: unknown): value is Project => record(value) && typeof value.id === 'string' && typeof value.name === 'string' && typeof value.is_shared_sample === 'boolean';
 export const isParticipants = (value: unknown): value is components['schemas']['ProjectParticipants'] => record(value) && Array.isArray(value.items) && value.items.every(isAccount);
 export const isProjects = (value: unknown): value is components['schemas']['ProjectList'] => record(value) && Array.isArray(value.items) && value.items.every(isProject);
 export function validated<T>(result: ApiResult<T>, check: (value: unknown) => value is T): ApiResult<T> {

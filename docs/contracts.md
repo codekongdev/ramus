@@ -1,4 +1,4 @@
-# ramus 계약 v1.5
+# ramus 계약 v1.7
 
 확정일: 2026-11-09 · 작업자: 메이슨, 헤이든 · 상태: 확정
 
@@ -70,7 +70,7 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 | `RUN_NOT_CANCELLABLE` | 409 | 이미 끝난 작업의 중단 요청 |
 | `RUN_NOT_RETRYABLE` | 409 | failed·cancelled가 아닌 작업의 재시도 요청 |
 | `TASK_NOT_READY` | 409 | 실행이 끝나지 않은 작업의 결과 정리 요청 |
-| `VERSION_CONFLICT` | 409 | 기준 버전이 최신 버전과 다름 |
+| `VERSION_CONFLICT` | 409 | 기준 버전이 최신 버전과 다르거나, 편집의 출처 정리 실행이 변경됨 |
 | `FILE_TYPE_UNSUPPORTED` | 422 | `.md`·`.txt`가 아니거나 UTF-8 텍스트가 아님(D9) |
 | `SHARE_TARGET_INVALID` | 422 | 보낼 대상이 없음(`conversation_ids`가 빈 목록이어도 `INVALID_INPUT`이 아니라 이 코드), 다른 프로젝트, 결과의 출처 대화 |
 | `PROJECT_CREATE_FORBIDDEN` | 403 | 대상 프로젝트에 대화를 만들 권한이 없음 |
@@ -84,6 +84,7 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 | `LLM_UNAVAILABLE` | 모델 호출 실패, 결과 반영 중 오류처럼 원인을 사용자에게 구분해 알릴 필요가 없는 실패 |
 | `LLM_OUTPUT_INVALID` | 모델 출력이 6.1의 스키마와 맞지 않음 |
 | `LLM_TIMEOUT` | 모델 응답이 제한 시간 안에 오지 않음 |
+| `SUMMARY_LIMIT_EXCEEDED` | 결과 정리의 원문 크기·호출 수·종합 단계가 처리 한도를 넘음. 원문을 조용히 잘라내지 않고 정리를 실패로 표시하며 기존 승인 버전을 보존 |
 | `RUN_INTERRUPTED` | running 상태에서 heartbeat가 끊김(서버 재시작 등). 자동으로 다시 실행하지 않는다(C8) |
 | `RUN_TIMED_OUT` | pending 상태로 너무 오래 대기함(F-03) |
 | `RUN_CREDENTIAL_MISMATCH` | 핸들러가 만든 모델 요청의 키 계정이 실행의 `credential_account_id`와 다름. 모델을 호출하지 않는다(ON-AC-08) |
@@ -155,7 +156,7 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 | `POST /api/tasks/{task_id}/summaries` | `{}` | `Result` | 결과 정리 실행 등록. 요청한 계정의 키 사용. 작업이 ready가 아니면 `TASK_NOT_READY`. 이미 정리 중이면 기존 실행을 돌려준다 |
 | `GET /api/results/{id}` | | `Result` | |
 | `GET /api/result-revisions/{id}` | | `ResultRevision` | 결론 보기 |
-| `POST /api/results/{id}/revisions` | `{base_version, conclusion}` | `ResultRevision` | 승인 저장. `base_version`이 최신이 아니면 `VERSION_CONFLICT` |
+| `POST /api/results/{id}/revisions` | `{base_version, source_run_id, conclusion}` | `ResultRevision` | 승인 저장. 기준 버전 또는 편집 시작 시 고정한 출처 실행이 변경되면 `VERSION_CONFLICT`. `source_run_id`는 초안의 `run_id` 또는 승인 결론의 `source.run_id` |
 | `GET /api/projects/{project_id}/results` | | `{items: [{result_id, title, latest_version, latest_revision_id, source_conversation_title, updated_at}]}` | 결과물 목록(조회 전용). 저장된 결과만 |
 | `POST /api/result-revisions/{id}/shares` | `{conversation_ids: string[]}` | `{items: [{conversation_id, outcome: "linked" \| "replaced" \| "unchanged" \| "kept_newer"}]}` | 대상별로 Share와 ConversationInput을 함께 만든다. 새 버전이면 교체(D8), 같은 버전이면 변경 없음, 대상에 더 새 버전이 이미 있으면 유지 |
 | `GET /api/conversations/{id}/inputs` | | `{items: ConversationInput[]}` | 오른쪽 공유받은 결과 목록. 이 대화의 AI 입력과 같다 |
@@ -206,7 +207,7 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 | `resource_revision` | resources | `id`, `resource_id`, `number`, `name`, `description`, `instructions \| null`, `content \| null`, `file_name \| null`, `content_hash`, `base_revision_id \| null`, `created_by` | (`resource_id`, `number`) 고유. 저장 후 수정하지 않는다 |
 | `conversation_resource` | resources | `conversation_id`, `resource_id`, `revision_id`, `applied_by`, `applied_at` | PK(`conversation_id`, `resource_id`). 최신 버전으로 자동 해석하지 않는다 |
 | `result` | results | `id`, `project_id`, `source_conversation_id`, `source_task_id`, `title`, `latest_revision_id \| null`, `latest_version`(없으면 0) | `source_task_id` 고유 |
-| `result_draft` | results | `result_id`, `status`, `conclusion \| null`, `base_version`, `run_id`, `message_from_seq`, `message_to_seq`, `error_code`, `error_params`(JSONB), `updated_at` | PK(`result_id`). 생성된 초안만 저장하고 편집 중 내용은 클라이언트에 둔다 |
+| `result_draft` | results | `result_id`, `status`, `conclusion \| null`, `base_version`, `run_id`, `message_from_seq`, `message_to_seq`, `context_snapshot`(JSONB), `error_code`, `error_params`(JSONB), `updated_at` | PK(`result_id`). 요청 시점의 자료·결론 버전 내용을 고정한다. 생성된 초안만 저장하고 편집 중 내용은 클라이언트에 둔다 |
 | `result_revision` | results | `id`, `result_id`, `version`, `title`, `conclusion`, `source`(JSONB), `saved_by` | (`result_id`, `version`) 고유. 저장 후 수정하지 않는다 |
 | `share` | sharing | `id`, `result_revision_id`, `target_conversation_id`, `shared_by` | (`result_revision_id`, `target_conversation_id`) 고유 |
 | `conversation_input` | sharing | `id`, `conversation_id`, `result_id`, `result_revision_id`, `version`, `title_snapshot`, `conclusion_snapshot`, `source_snapshot`(JSONB), `origin`, `created_by`, `updated_at` | (`conversation_id`, `result_id`) 고유. 새 버전을 보내면 이 행을 갱신한다(D8) |
@@ -353,9 +354,9 @@ export type TaskModalProps = {
 | D10 | 프로젝트 관계 보기(WF-13)를 MVP에 포함한다 |
 | C1 | 성공 응답은 감싸지 않고, 목록은 `{items}`, 변경 응답은 항상 JSON 객체 |
 | C2 | JSON 필드는 `snake_case` |
-| C3 | 실행 입력 스냅샷은 실행기가 실행을 점유하는 시점에 만든다(v1.3에서 등록 시점을 변경) |
+| C3 | 업무 실행 입력 스냅샷은 실행기가 실행을 점유하는 시점에 만든다(v1.3). 결과 정리는 요청 시점의 메시지 범위·자료·결론 버전을 고정하고 점유 시 그 입력을 기록한다(v1.6) |
 | C4 | SSE는 지난 이벤트를 다시 보내지 않고, 클라이언트가 연결마다 상태를 다시 조회한다 |
-| C5 | 결과 초안은 생성된 내용만 서버에 저장하고, 편집 중 내용은 저장 버튼을 누를 때 기준 버전과 함께 보낸다 |
+| C5 | 결과 초안은 생성된 내용만 서버에 저장하고, 편집 중 내용은 저장 버튼을 누를 때 기준 버전과 출처 실행 ID를 함께 보낸다. 같은 승인 버전에서 재정리해도 편집 본문이 다른 출처로 저장되지 않게 한다 |
 | C6 | AI 실행 요청이 거절되면(키 없음, 활성 실행 있음) 메시지를 저장하지 않고 클라이언트가 입력 초안을 유지한다 |
 | C7 | 작업 중단·재시도는 그 작업을 요청한 계정만 할 수 있다 |
 | C8 | heartbeat가 끊긴 실행은 자동으로 다시 실행하지 않고 재시도할 수 있는 failed로 둔다. 사용자 동의 없이 요청자의 키로 비용이 다시 나가지 않게 하기 위해서다 |
@@ -364,6 +365,8 @@ export type TaskModalProps = {
 
 | 날짜 | 버전 | 내용 |
 |---|---|---|
+| 2026-11-09 | v1.7 | B4 추가 검수: 긴 정리의 구간별 추출·종합 한도 실패 코드 `SUMMARY_LIMIT_EXCEEDED` 추가. 정리·승인 멱등 재전송에서도 현재 참여 권한을 확인 |
+| 2026-11-09 | v1.6 | B4: 정리 요청 시점 입력 고정용 `result_draft.context_snapshot`, 승인 저장의 필수 `source_run_id` 추가. 기준 버전이 같아도 재생성된 초안과 다른 출처로 편집 본문을 저장하면 409 |
 | 2026-11-09 | v1.5 | A5 work 입력의 메시지 범위, 현재 업무 Run의 Task 상태·이벤트 동기화, 대화 입력·Task 결과 조회 포트(6장·6.2). HTTP·SSE 페이로드와 테이블 스키마는 변경하지 않음 |
 | 2026-11-09 | v1.4 | A1: 참여자 조회, 인증 입력 검증, 이메일·IP 시간당 상한, HMAC과 세션 재발급 상한 |
 | 2026-11-09 | v1 | 최초 확정. P0-A1·P0-B1에서 정해진 항목을 반영 |
