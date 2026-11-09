@@ -1,0 +1,65 @@
+.task-queue {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing) * 3);
+  min-width: 0;
+}
+
+.task-queue__heading {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing) * 2);
+}
+
+.task-queue__heading h2 {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.task-queue__count,
+.task-queue__hint {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.task-queue__hint,
+.task-queue__error p {
+  margin: 0;
+  line-height: var(--text-sm--line-height);
+  overflow-wrap: anywhere;
+}
+
+.task-queue__error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(var(--spacing) * 2);
+  font-size: var(--text-sm);
+}
+
+.task-queue__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.task-queue__list li + li {
+  border-top: var(--hairline) solid var(--border);
+}
+
+.task-queue .task-queue__row {
+  width: 100%;
+  min-height: calc(var(--spacing) * 12);
+  height: auto;
+  justify-content: space-between;
+  gap: calc(var(--spacing) * 2);
+  padding: calc(var(--spacing) * 3) calc(var(--spacing) * 2);
+  text-align: left;
+}
+
+.task-queue__title {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

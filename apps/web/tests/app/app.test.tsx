@@ -24,6 +24,8 @@ beforeEach(() => {
   HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
     this.removeAttribute('open');
   });
+  vi.stubGlobal('EventSource', class { addEventListener() {} removeEventListener() {} close() {} });
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { code: 'NOT_IMPLEMENTED', message: '아직 준비 중입니다.', details: null } }), { status: 501 })));
   window.history.replaceState(null, '', '/');
   container = document.createElement('div');
   document.body.append(container);
@@ -33,6 +35,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.unstubAllGlobals();
 });
 
 const page = () => container.querySelector('[data-page]')?.getAttribute('data-page') ?? null;

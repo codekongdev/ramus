@@ -42,3 +42,4 @@ export type {
 export { UiProvider } from './UiProvider';
 export { Dialog } from './Dialog';
 export type { DialogProps } from './Dialog';
+export { TaskStatusBadge } from './TaskStatusBadge';

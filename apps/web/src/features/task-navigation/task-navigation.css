@@ -1,0 +1,8 @@
+.task-navigation { display: grid; gap: calc(var(--spacing) * 3); }
+.task-navigation h2 { margin: 0; padding-inline: calc(var(--spacing) * 2); font-size: var(--text-sm); font-weight: var(--font-weight-semibold); color: var(--muted-foreground); }
+.task-navigation p { font-size: var(--text-sm); color: var(--muted-foreground); }
+.task-navigation ul { list-style: none; margin: 0; padding: 0; }
+.task-navigation__entry { display: flex; align-items: center; gap: calc(var(--spacing) * 2); width: 100%; min-height: 44px; padding: calc(var(--spacing) * 2); text-align: start; border: 0; border-radius: var(--radius-sm); color: var(--foreground); background: transparent; font: inherit; font-size: var(--text-sm); cursor: pointer; }
+.task-navigation__entry span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-navigation__entry:hover, .task-navigation__entry[aria-current] { background: var(--accent); }
+.task-navigation__entry:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
