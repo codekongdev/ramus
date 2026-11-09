@@ -1,0 +1,154 @@
+/* Resource revision views share the resource modal's existing typography and semantic tokens. */
+.revisions-heading-row,
+.revisions-actions,
+.revisions-actions-end,
+.revisions-preserved {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing) * 3);
+  flex-wrap: wrap;
+}
+
+.revisions-heading-row .resources-heading {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.revisions-description,
+.revisions-notice {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.revisions-notice {
+  padding: calc(var(--spacing) * 3);
+  background: var(--muted);
+  border-radius: var(--radius-md, 8px);
+}
+
+.revisions-metadata {
+  margin: 0;
+  display: grid;
+  gap: calc(var(--spacing) * 2);
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.revisions-metadata > div {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: calc(var(--spacing) * 3);
+}
+
+.revisions-metadata dt {
+  color: var(--muted-foreground);
+}
+
+.revisions-metadata dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.revisions-content,
+.revisions-history {
+  min-width: 0;
+}
+
+.revisions-content h4,
+.revisions-history h4 {
+  margin: 0 0 calc(var(--spacing) * 2);
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 600;
+}
+
+.revisions-content pre {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  font-size: var(--text-sm, 0.875rem);
+  line-height: 1.65;
+  padding: calc(var(--spacing) * 4);
+  background: var(--muted);
+  border-radius: var(--radius-md, 8px);
+}
+
+.revisions-history ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.revisions-history li + li {
+  border-top: var(--hairline, 1px) solid var(--border);
+}
+
+.ramus .revisions-step .hp-button.revisions-history-entry {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: calc(var(--spacing) * 1) calc(var(--spacing) * 3);
+  width: 100%;
+  height: auto;
+  min-height: 44px;
+  text-align: left;
+  white-space: normal;
+  justify-content: stretch;
+  padding: calc(var(--spacing) * 3);
+}
+
+.ramus .revisions-step .hp-button.revisions-history-entry[aria-current='true'] {
+  background: var(--muted);
+}
+
+.revisions-history-version {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing) * 2);
+  flex-wrap: wrap;
+}
+
+.revisions-history-name,
+.revisions-history-meta {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.revisions-history-meta {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing) * 2);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 400;
+}
+
+.revisions-history-meta > * {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.revisions-actions {
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: calc(var(--spacing) * 4);
+  border-top: var(--hairline, 1px) solid var(--border);
+}
+
+.revisions-actions-end {
+  justify-content: flex-end;
+}
+
+@media (max-width: 420px) {
+  .revisions-actions > button,
+  .revisions-actions-end,
+  .revisions-actions-end > button {
+    flex: 1;
+  }
+
+  .revisions-history-meta {
+    grid-column: 1 / -1;
+  }
+}

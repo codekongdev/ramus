@@ -9,7 +9,7 @@ import type { Task } from '../../lib/api/task-contract';
 import { AppShell, type AppShellSlots } from '../layout/AppShell';
 import { useModalHost } from '../modal/ModalHost';
 import { navigate } from '../routing/useRoute';
-
+import { ResourcesMenuButton } from '../../features/resources';
 
 export type WorkspacePageProps = {
   readonly projectId: string;
@@ -53,6 +53,7 @@ export function WorkspacePage({
     });
   }, [openModal, renderTaskHeaderActions, renderTaskResultTab, ensureAiConnection]);
   return <AppShell project={header.project} participants={header.participants} {...slots}
+    workspaceMenu={slots?.workspaceMenu ?? <ResourcesMenuButton projectId={projectId} conversationId={conversationId} />}
     conversation={slots?.conversation ?? <Conversation projectId={projectId} conversationId={conversationId} ensureAiConnection={ensureAiConnection} />}
     conversationTree={projectId && <TaskConversationTree projectId={projectId} conversationId={conversationId}
       onSelectConversation={selectConversation} onInitialConversation={selectInitialConversation}
