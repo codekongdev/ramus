@@ -41,6 +41,17 @@ docker compose exec db createdb -U ramus ramus_wt2
 uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
 ```
 
+전체 테이블·컬럼·제약의 기준은 [스키마 계약](docs/contracts.md#5-테이블-스키마)이다.
+마이그레이션 후 공동 샘플 프로젝트를 준비한다.
+
+```sh
+uv run --project apps/api python -m ramus_api.modules.seed
+```
+
+이 명령은 고정 시드 키에서 UUIDv5를 만들고 `project_id`를 JSON으로 출력한다.
+여러 번 또는 동시에 실행해도 프로젝트와 시드 표식은 하나만 생성하며, 기존 이름과 데이터를 유지한다.
+예시 대화·자료·결과 콘텐츠와 로그인 참여자 등록은 후속 작업에서 추가한다.
+
 API는 `uv run --project apps/api python -m ramus_api`, 웹은 `pnpm --filter @ramus/web dev`로 띄운다.
 웹 개발 서버는 `/api` 요청을 `RAMUS_API_PORT`로 넘긴다.
 
