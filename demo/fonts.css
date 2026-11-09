@@ -1,0 +1,8 @@
+/* Inter is distributed under the SIL Open Font License; see assets/Inter-OFL-1.1.txt. */
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(assets/inter-latin-variable.woff2) format('woff2');
+}
