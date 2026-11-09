@@ -1,0 +1,93 @@
+{
+  "unit": "U08",
+  "date": "2026-11-09",
+  "scope": "step1: API runtime, login, persistent shared conversations",
+  "source_repository_commit": "4bfee18",
+  "adaptations": [
+    "Only access/conversations and request receipts retained (7 tables)",
+    "Explicit migrations and seed; no startup DDL or seed",
+    "Current authorization checked before cached request replay",
+    "Reject NUL and invalid UTF-8 at API inputs",
+    "Separate Compose project ramus-setup-local and PostgreSQL port 55433"
+  ],
+  "commands": [
+    {
+      "command": "pnpm bootstrap:api",
+      "exit_code": 0,
+      "result": "Dependencies, isolated PostgreSQL, Alembic upgrade, demo seed, OpenAPI/client types"
+    },
+    {
+      "command": "pnpm verify --postgres",
+      "exit_code": 0,
+      "result": "Ruff, contract generation, 3 Domain Unit, 27 Integration/contract/input/migration tests, TypeScript, actual PostgreSQL HTTP"
+    },
+    {
+      "command": "bash -n scripts/bootstrap-api.sh",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "domain_unit_passed": 3,
+  "integration_contract_input_migration_passed": 27,
+  "postgres": {
+    "unit": "U08",
+    "milestone": "step1",
+    "database": "PostgreSQL 17",
+    "transport": "actual HTTP",
+    "distinct_authenticated_users": true,
+    "server_author_verified": true,
+    "shared_message_verified": true,
+    "replayed_request_no_duplicate": true,
+    "concurrent_same_request_commits_once": true,
+    "same_id_different_input_status": 409,
+    "server_restart_persists_data_and_sessions": true,
+    "paid_model_calls": 0,
+    "acceptance_scope": {
+      "A01": "message portion only",
+      "A11": "message storage, restart and replay only"
+    },
+    "not_run": [
+      "browser UI",
+      "live AI",
+      "remaining P0 acceptance"
+    ]
+  },
+  "independent_review": {
+    "blocking_findings_remaining": 0,
+    "corrected": [
+      "NUL/invalid UTF-8 inputs previously could reach unsupported DB encoding",
+      "Clarified bootstrap does not start HTTP server"
+    ],
+    "method": "Read-only source review and memory-only DTO/psycopg reproduction"
+  },
+  "warnings": [
+    "Starlette TestClient with httpx is deprecated; no test failure"
+  ],
+  "validation_notes": [
+    "The first logging wrapper failed because artifacts/ did not yet exist although all checks completed; the final recorded pnpm verify --postgres run exited 0."
+  ],
+  "paid_model_calls": 0,
+  "model_cost_usd": 0,
+  "acceptance_scope": {
+    "M01": "Shared messages only",
+    "M08": "Authentication, request replay, input/storage boundaries only",
+    "A01": "Message portion only",
+    "A11": "Message persistence, restart, replay only"
+  },
+  "not_run": [
+    "Browser UI/E2E",
+    "Real AI calls",
+    "Remaining P0/A01-A12 acceptance"
+  ],
+  "user_reuse": "not yet observed",
+  "integrity": {
+    "tracked_files_checked": 54,
+    "json_and_local_markdown_links": "passed",
+    "credential_and_local_file_exclusion": "passed",
+    "staged_diff_whitespace": "passed",
+    "original_working_tree": "unchanged"
+  }
+}

@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "api:generate": "openapi-typescript ../../contracts/openapi.json -o src/api/schema.d.ts",
     "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",

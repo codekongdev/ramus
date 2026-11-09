@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "maximum_revision_cycles": 5,
+  "change_approach_after_no_progress": 2,
+  "weights": {
+    "correctness": 40,
+    "tests": 30,
+    "boundaries": 20,
+    "maintainability": 10
+  },
+  "units": [
+    {
+      "id": "U08",
+      "scope": "ramus-setup 1단계: 서버 실행 기반·로그인·공동 대화",
+      "requirements": [
+        "M01",
+        "M08 (공동 대화 부분)"
+      ],
+      "acceptance": [
+        "A01 (메시지 부분)",
+        "A11 (메시지 저장·재시작·재시도 부분)"
+      ],
+      "status": "passed",
+      "score": 100,
+      "mandatory_pass": true,
+      "revision_cycles": 2,
+      "no_progress_streak": 0,
+      "mandatory": [
+        "Alembic으로 스키마 이관 후 명시적 seed; 앱 시작은 DDL·seed를 수행하지 않음",
+        "독립한 두 서버 세션에서 메시지 공유·작성자·순서·재시작 후 영속성",
+        "로그인 실패·세션 만료·로그아웃·멤버십·프로젝트 범위·재시도 중복 경계",
+        "실제 API·OpenAPI·생성 프론트 타입 일치",
+        "기존 ramus DB·사용자 변경 보존; 비밀값·미반영 기능 제외"
+      ],
+      "checks": {
+        "correctness": [
+          {
+            "criterion": "로그인·공동 대화·작성자·순서·영속성",
+            "points": 20,
+            "passed": true
+          },
+          {
+            "criterion": "명시적 이관·초기화와 DTO/계약 일치",
+            "points": 20,
+            "passed": true
+          }
+        ],
+        "tests": [
+          {
+            "criterion": "Domain Unit·Ruff 통과",
+            "points": 10,
+            "passed": true
+          },
+          {
+            "criterion": "Integration·권한·재시도·migration 통과",
+            "points": 10,
+            "passed": true
+          },
+          {
+            "criterion": "실제 PostgreSQL·독립 HTTP 두 세션·서버 재시작",
+            "points": 10,
+            "passed": true
+          }
+        ],
+        "boundaries": [
+          {
+            "criterion": "권한 취소 후 replay·입력·출처·비밀값 경계",
+            "points": 10,
+            "passed": true
+          },
+          {
+            "criterion": "기존 DB 분리·단계 밖 기능 제외",
+            "points": 10,
+            "passed": true
+          }
+        ],
+        "maintainability": [
+          {
+            "criterion": "Clean Architecture·모듈 경계·재현 가능한 실행 안내",
+            "points": 10,
+            "passed": true
+          }
+        ]
+      },
+      "evidence": [
+        "docs/verification/U08-step1.json"
+      ],
+      "not_run": [
+        "브라우저 UI",
+        "실제 모델 호출",
+        "전체 P0 수용 시험"
+      ],
+      "commit_lookup": "git log -1 --format=%H -- docs/verification/U08-step1.json",
+      "history": [
+        {
+          "event": "scope and verification plan",
+          "result": "step1 only, defined before verification; independent implementation/review"
+        },
+        {
+          "event": "review corrections",
+          "result": "Cached project result authorization and DB-unsafe text input boundaries corrected; regression checks added"
+        },
+        {
+          "event": "final verification",
+          "result": "All mandatory criteria and 100 weighted points satisfied; original P0 results not reused"
+        }
+      ]
+    }
+  ]
+}

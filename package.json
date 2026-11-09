@@ -2,6 +2,10 @@
   "name": "ramus",
   "private": true,
   "scripts": {
+    "bootstrap:api": "bash scripts/bootstrap-api.sh",
+    "dev:api": "uv run --project apps/api uvicorn ramus_api.main:app --host 127.0.0.1 --port 8000",
+    "typegen": "uv run --project apps/api python scripts/export_openapi.py && pnpm --dir apps/web api:generate",
+    "verify": "uv run --project apps/api python scripts/verify.py",
     "db:up": "docker compose up -d --wait db",
     "db:stop": "docker compose stop db"
   },
