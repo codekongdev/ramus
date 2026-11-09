@@ -23,3 +23,27 @@ uv sync --project apps/api --locked
 
 환경변수는 `.env.example`을 참고해 로컬 `.env`에 설정한다.
 실제 키와 로컬 데이터는 커밋하지 않는다.
+
+## 워크트리별 설정
+
+워크트리마다 루트 `.env`에서 DB 이름과 두 포트를 다르게 지정한다. Postgres 서버(`pnpm db:up`)는 함께 쓴다.
+
+```sh
+DATABASE_URL=postgresql+psycopg://ramus:ramus-local@127.0.0.1:55432/ramus_wt2
+RAMUS_WEB_PORT=5183
+RAMUS_API_PORT=8010
+```
+
+개발용 DB를 만들고 마이그레이션을 적용한다(저장소 루트에서 실행).
+
+```sh
+docker compose exec db createdb -U ramus ramus_wt2
+uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head
+```
+
+API는 `uv run --project apps/api python -m ramus_api`, 웹은 `pnpm --filter @ramus/web dev`로 띄운다.
+웹 개발 서버는 `/api` 요청을 `RAMUS_API_PORT`로 넘긴다.
+
+테스트(`uv run --project apps/api pytest`)는 `DATABASE_URL`의 개발용 DB를 쓰지 않는다.
+같은 서버에 `ramus_test_<무작위>` 임시 DB를 매번 만들어 마이그레이션하고, 끝나면 지운다.
+Postgres가 꺼져 있으면 통합 테스트는 실패한다. 단위 테스트만 돌릴 때는 `-m "not integration"`을 붙인다.
