@@ -1,4 +1,4 @@
-name: ramus-setup-local
+name: ramus-local
 services:
   db:
     image: postgres:17-alpine
@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: ramus
       POSTGRES_PASSWORD: ramus-local
     ports:
-      - "127.0.0.1:55433:5432"
+      - "127.0.0.1:55432:5432"
     volumes:
       - ramus-db:/var/lib/postgresql/data
     healthcheck:
