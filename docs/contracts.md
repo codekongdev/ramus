@@ -1,4 +1,4 @@
-# ramus 계약 v1
+# ramus 계약 v1.1
 
 확정일: 2026-11-09 · 작업자: 메이슨, 헤이든 · 상태: 확정
 
@@ -33,6 +33,7 @@
 | 멱등 범위 | receipt는 (행위자, 범위, 키)로 구분한다. 로그인 전 요청의 행위자는 `anonymous`다. 프론트는 사용자 행동 하나마다 키를 하나 만들고, 그 행동을 재시도할 때 같은 키를 다시 쓴다 |
 | 낙관적 잠금 | 버전이 있는 대상(결과, 공통 자료)은 기준 버전을 함께 보내고, 최신 버전과 다르면 409 `VERSION_CONFLICT`를 돌려준다. `details`에 최신 버전 정보를 담는다 |
 | 권한 | 프로젝트 하위 리소스는 그 프로젝트의 참여자만 조회·변경한다. 참여자가 아니면 존재를 알리지 않도록 404 `NOT_FOUND`를 돌려준다. 로그인하지 않았으면 401 `UNAUTHORIZED` |
+| 오류 문장 | 응답의 `error.message`와 `Run`·`Task`·`ResultDraft`의 `error.message`는 응답을 만들 때 오류 코드와 매개변수로 문구표에서 만든다. DB에는 사용자에게 보여 줄 문장을 저장하지 않는다(로드맵 9.3) |
 | 길이 제한 | 대화·결과 제목 100자, 메시지 본문 20,000자, 결론 본문 20,000자, 공통 자료 지침·내용 100,000자, 한 번에 보낼 대상 대화 20개, 한 번에 분기할 작업 4개 |
 
 ### 1.1 인증과 세션
@@ -177,17 +178,19 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 | `ai_connection` | access | `account_id`, `provider`(`openai`), `ciphertext`, `status`, `verified_at` | PK(`account_id`). 키 원문·끝자리는 저장하지 않는다 |
 | `conversation` | conversations | `id`, `project_id`, `parent_id \| null`, `task_id \| null`, `title`, `origin`(`top` \| `branch` \| `from_result`), `created_by`, `seed_key \| null` | (`project_id`, `title`) 인덱스 |
 | `message` | conversations | `id`, `conversation_id`, `seq`, `author_kind`, `author_account_id \| null`, `example_author_label \| null`, `body`, `requested_by \| null`, `run_id \| null` | (`conversation_id`, `seq`) 고유 |
-| `task` | execution | `id`, `source_conversation_id`, `child_conversation_id`, `source_run_id`, `ordinal`, `title`, `goal`, `status`, `current_run_id`, `requested_by`, `started_at`, `finished_at`, `error_code`, `error_message` | `child_conversation_id` 고유, (`source_run_id`, `ordinal`) 고유(분기 중복 방지) |
-| `run` | execution | `id`, `project_id`, `conversation_id`, `task_id \| null`, `purpose`, `target_id \| null`(summary면 `result_id`), `status`, `requested_by`, `credential_account_id`, `input_snapshot`(JSONB), `attempt`, `heartbeat_at`, `started_at`, `finished_at`, `error_code`, `error_message` | 부분 고유: (`conversation_id`) where `purpose='work'` and `status in (pending, running)`. 부분 고유: (`target_id`) where `purpose='summary'` and `status in (pending, running)`. (`status`, `created_at`) 인덱스 |
+| `task` | execution | `id`, `source_conversation_id`, `child_conversation_id`, `source_run_id`, `ordinal`, `title`, `goal`, `status`, `current_run_id`, `requested_by`, `started_at`, `finished_at`, `error_code`, `error_params`(JSONB) | `child_conversation_id` 고유, (`source_run_id`, `ordinal`) 고유(분기 중복 방지) |
+| `run` | execution | `id`, `project_id`, `conversation_id`, `task_id \| null`, `purpose`, `target_id \| null`(summary면 `result_id`), `status`, `requested_by`, `credential_account_id`, `input_snapshot`(JSONB), `attempt`, `heartbeat_at`, `started_at`, `finished_at`, `error_code`, `error_params`(JSONB) | 부분 고유: (`conversation_id`) where `purpose='work'` and `status in (pending, running)`. 부분 고유: (`target_id`) where `purpose='summary'` and `status in (pending, running)`. (`status`, `created_at`) 인덱스 |
 | `resource` | resources | `id`, `project_id`, `kind`, `latest_revision_id`, `created_by`, `seed_key \| null` | |
 | `resource_revision` | resources | `id`, `resource_id`, `number`, `name`, `description`, `instructions \| null`, `content \| null`, `file_name \| null`, `content_hash`, `base_revision_id \| null`, `created_by` | (`resource_id`, `number`) 고유. 저장 후 수정하지 않는다 |
 | `conversation_resource` | resources | `conversation_id`, `resource_id`, `revision_id`, `applied_by`, `applied_at` | PK(`conversation_id`, `resource_id`). 최신 버전으로 자동 해석하지 않는다 |
 | `result` | results | `id`, `project_id`, `source_conversation_id`, `source_task_id`, `title`, `latest_revision_id \| null`, `latest_version`(없으면 0) | `source_task_id` 고유 |
-| `result_draft` | results | `result_id`, `status`, `conclusion \| null`, `base_version`, `run_id`, `message_from_seq`, `message_to_seq`, `error_code`, `updated_at` | PK(`result_id`). 생성된 초안만 저장하고 편집 중 내용은 클라이언트에 둔다 |
+| `result_draft` | results | `result_id`, `status`, `conclusion \| null`, `base_version`, `run_id`, `message_from_seq`, `message_to_seq`, `error_code`, `error_params`(JSONB), `updated_at` | PK(`result_id`). 생성된 초안만 저장하고 편집 중 내용은 클라이언트에 둔다 |
 | `result_revision` | results | `id`, `result_id`, `version`, `title`, `conclusion`, `source`(JSONB), `saved_by` | (`result_id`, `version`) 고유. 저장 후 수정하지 않는다 |
 | `share` | sharing | `id`, `result_revision_id`, `target_conversation_id`, `shared_by` | (`result_revision_id`, `target_conversation_id`) 고유 |
 | `conversation_input` | sharing | `id`, `conversation_id`, `result_id`, `result_revision_id`, `version`, `title_snapshot`, `conclusion_snapshot`, `source_snapshot`(JSONB), `origin`, `created_by`, `updated_at` | (`conversation_id`, `result_id`) 고유. 새 버전을 보내면 이 행을 갱신한다(D8) |
 | `seed_marker` | seed | `key`, `version`, `applied_at` | PK(`key`) |
+
+실패 정보는 `error_code`와 `error_params`로만 저장한다. `error_params`는 문구에 들어갈 값(예: 실패한 자료 이름)만 담고, 문장은 응답을 만들 때 요청 언어의 문구표로 만든다. 모델 제공자의 원문 오류 같은 운영용 상세 원인은 DB에 저장하지 않고 서버 로그에만 남긴다.
 
 `run.input_snapshot`에는 실행에 실제로 쓴 메시지 범위(`message_from_seq`, `message_to_seq`), 자원 버전 ID 목록, 결론 버전 ID 목록을 기록한다. 스냅샷은 실행을 등록하는 시점에 만든다. 이후 설정이 바뀌어도 그 실행의 입력은 바뀌지 않는다.
 
@@ -326,3 +329,4 @@ export type TaskModalProps = {
 | 날짜 | 버전 | 내용 |
 |---|---|---|
 | 2026-11-09 | v1 | 최초 확정. P0-A1·P0-B1에서 정해진 항목을 반영 |
+| 2026-11-09 | v1.1 | `task`·`run`의 `error_message`를 `error_params`(JSONB)로 바꾸고 `result_draft`에도 추가. 사용자에게 보여 줄 문장을 DB에 저장하지 않는 규칙 추가(로드맵 9.3-1) |
