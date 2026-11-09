@@ -45,6 +45,7 @@ CONTRACT_ENDPOINTS: tuple[Endpoint, ...] = (
     Endpoint("delete", "/api/me/ai-connection", "access", "disconnectAi"),
     Endpoint("get", "/api/projects", "projects", "listProjects"),
     Endpoint("post", "/api/projects", "projects", "createProject"),
+    Endpoint("get", "/api/projects/{project_id}/participants", "projects", "listProjectParticipants"),
     Endpoint("get", "/api/projects/search", "projects", "searchProjects"),
     Endpoint("get", "/api/projects/{project_id}/conversations", "conversations", "listConversations"),
     Endpoint("post", "/api/projects/{project_id}/conversations", "conversations", "createConversation"),

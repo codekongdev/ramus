@@ -1,4 +1,4 @@
-# ramus 계약 v1.3
+# ramus 계약 v1.4
 
 확정일: 2026-11-09 · 작업자: 메이슨, 헤이든 · 상태: 확정
 
@@ -41,11 +41,15 @@
 
 | 항목 | 규칙 |
 |---|---|
-| 인증 코드 | 숫자 6자리, 해시로 저장, 10분 후 만료, 코드당 5회까지 확인, 같은 이메일 재요청은 60초 간격 |
+| 인증 코드 | ASCII 숫자 6자리, 서버 비밀값 기반 HMAC으로 저장, 10분 후 만료, 코드당 5회까지 확인, 같은 이메일 재요청은 60초 간격. 이메일은 정규화 후 254자 이하이며 제어 문자를 허용하지 않는다 |
+| 인증 요청 상한 | 최근 1시간 기준 코드 요청은 이메일당 10회·접속 IP당 60회, 코드 확인은 이메일당 30회·접속 IP당 300회. 재전송으로 상한이 초기화되지 않는다. 프록시 전달 헤더 대신 서버가 확인한 접속 IP를 사용한다. 상한에 걸리면 429 `AUTH_RATE_LIMITED`, `details.resend_available_at`에 다음 허용 시각을 준다 |
+| 인증 재시도 | verify를 같은 키와 본문으로 재시도하면 코드 만료 전까지 새 세션을 발급하되 최초 요청을 포함해 3회로 제한한다. receipt에는 코드 원문 대신 서버 비밀값 기반 HMAC을 사용한 fingerprint를 남긴다. 로그아웃은 세션이 없어도 `{}`를 돌려준다 |
 | 메일 발송 | `Mailer` 포트. 개발 환경은 서버 로그에 코드를 출력하고, 시연 환경은 실제 발송 서비스를 쓴다(로드맵 D3) |
 | 세션 | 쿠키 `ramus_session`. `HttpOnly`, `SameSite=Lax`, `Path=/`, HTTPS 환경에서는 `Secure`. 14일 후 만료. DB에는 토큰 해시만 저장한다 |
 | 공동 샘플 | 로그인에 성공하면 고정 ID의 공동 샘플 프로젝트에 편집 참여자로 등록한다. 이미 참여 중이면 그대로 둔다 |
 | CSRF | 같은 출처 호출만 허용하고, 변경 요청에 JSON 본문과 사용자 정의 헤더(`Idempotency-Key`)를 요구해 다른 사이트의 폼 전송을 막는다 |
+
+A1 인증 보완: `RAMUS_AUTH_SECRET`은 32자 이상의 서버 비밀값으로 배포 환경에서 고정한다. 로컬 기본값은 프로세스가 재시작되면 바뀌며 기존 코드·멱등 재시도는 다시 요청해야 한다. 인증 상한의 내부 저장소 `auth_attempt`은 `id`, `scope`, `subject_hash`, `created_at`으로 이루어지며 이메일·IP 원문을 저장하지 않는다.
 
 ### 1.2 업무 오류 코드
 
@@ -59,7 +63,7 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 | `IDEMPOTENCY_CONFLICT` | 409 | 같은 키로 다른 본문 |
 | `AUTH_CODE_INVALID` | 422 | 인증 코드 불일치 |
 | `AUTH_CODE_EXPIRED` | 422 | 인증 코드 만료·확인 횟수 초과 |
-| `AUTH_RATE_LIMITED` | 429 | 인증 코드 재요청 간격 위반 |
+| `AUTH_RATE_LIMITED` | 429 | 인증 코드 재요청 간격·요청/확인/세션 재발급 상한 위반 |
 | `AI_CONNECTION_REQUIRED` | 409 | 키가 연결되지 않은 계정이 AI 실행을 요청함. 메시지는 저장하지 않는다 |
 | `AI_KEY_INVALID` | 422 | 키 확인 호출 실패 |
 | `ACTIVE_RUN_EXISTS` | 409 | 같은 대화에 활성 AI 실행이 있음. 메시지는 저장하지 않는다 |
@@ -122,6 +126,7 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 | `PUT /api/me/ai-connection` | `{api_key}` | `{status: "connected"}` | 저비용 호출로 키를 확인한 뒤 암호화해 저장. 실패 시 `AI_KEY_INVALID` |
 | `DELETE /api/me/ai-connection` | | `{status: "none"}` | 이후 새 실행 불가. 이미 접수한 실행은 키 조회 시점에 실패 처리 |
 | `GET /api/projects` | | `{items: Project[]}` | 참여 중인 프로젝트 |
+| `GET /api/projects/{project_id}/participants` | — | `{items: Account[]}` | 프로젝트 참여자만 조회. 미인증은 401, 없는 프로젝트·비참여는 404 |
 | `POST /api/projects` | `{name}` | `Project` | 만든 사람을 편집 참여자로 등록 |
 | `GET /api/projects/search?q=` | | `{items: Project[]}` | 대화를 만들 권한이 있는 프로젝트. 현재 프로젝트 포함 |
 | `GET /api/projects/{project_id}/conversations` | | `{items: Conversation[]}` | 트리 전체. `parent_id`로 구성 |
@@ -356,6 +361,7 @@ export type TaskModalProps = {
 
 | 날짜 | 버전 | 내용 |
 |---|---|---|
+| 2026-11-09 | v1.4 | A1: 참여자 조회, 인증 입력 검증, 이메일·IP 시간당 상한, HMAC과 세션 재발급 상한 |
 | 2026-11-09 | v1 | 최초 확정. P0-A1·P0-B1에서 정해진 항목을 반영 |
 | 2026-11-09 | v1.2 | P0-A3 구현에 맞춰 보완: 실제 이름은 `contracts/openapi.json` 기준, 빈 본문 변경 요청, `NOT_IMPLEMENTED`, 빈 보낼 대상 목록의 오류 코드 |
 | 2026-11-09 | v1.1 | `task`·`run`의 `error_message`를 `error_params`(JSONB)로 바꾸고 `result_draft`에도 추가. 사용자에게 보여 줄 문장을 DB에 저장하지 않는 규칙 추가(로드맵 9.3-1) |

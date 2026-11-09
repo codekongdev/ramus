@@ -1,3 +1,7 @@
+import { useEffect } from 'react';
+import { AuthProvider, useAuth } from '../features/auth/AuthProvider';
+import { authMessages as m } from '../features/auth/messages';
+import { Button } from '../ui';
 import './app.css';
 import { ModalHostProvider } from './modal/ModalHost';
 import { LoginPage } from './pages/LoginPage';
@@ -6,21 +10,20 @@ import { WorkspacePage } from './pages/WorkspacePage';
 import { useRoute } from './routing/useRoute';
 
 export function App() {
-  return (
-    <ModalHostProvider>
-      <AppRoutes />
-    </ModalHostProvider>
-  );
+  return <AuthProvider><ModalHostProvider><AppRoutes /></ModalHostProvider></AuthProvider>;
 }
 
 function AppRoutes() {
-  const [route] = useRoute();
-  switch (route.name) {
-    case 'login':
-      return <LoginPage />;
-    case 'workspace':
-      return <WorkspacePage projectId={route.projectId} conversationId={route.conversationId} />;
-    case 'notFound':
-      return <NotFoundPage />;
-  }
+  const [route, navigate] = useRoute();
+  const [auth, dispatch] = useAuth();
+  useEffect(() => {
+    if (route.name === 'notFound') return;
+    if (auth.status === 'anonymous' && route.name !== 'login') navigate({ name: 'login' }, { replace: true });
+    if (auth.status === 'authenticated' && auth.me && (route.name === 'login' || !route.projectId)) navigate({ name: 'workspace', projectId: auth.me.default_project_id }, { replace: true });
+  }, [auth.status, auth.me, route, navigate]);
+  if (route.name === 'notFound') return <NotFoundPage />;
+  if (auth.status === 'initial' || auth.status === 'checking' || auth.status === 'checkFailed') return <main className="app-page"><div className="auth-session"><p role={auth.error ? 'alert' : 'status'}>{auth.error ?? m.checkSession}</p>{auth.status === 'checkFailed' && <Button onClick={() => dispatch({ type: 'start' })}>{m.retry}</Button>}</div></main>;
+  if (auth.status === 'anonymous') return <LoginPage />;
+  if (auth.me) return <WorkspacePage projectId={route.name === 'workspace' && route.projectId ? route.projectId : auth.me.default_project_id} conversationId={route.name === 'workspace' ? route.conversationId : undefined} />;
+  return null;
 }

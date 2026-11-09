@@ -1,11 +1,18 @@
 """Application-level port for running a change at most once per idempotency key."""
 
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from typing import Any, Protocol, TypeVar
 
 JsonObject = dict[str, Any]
 
 TransactionT = TypeVar("TransactionT")
+
+
+@dataclass(frozen=True)
+class ExecutionResult:
+    response: JsonObject
+    replayed: bool
 
 
 class IdempotentExecutor(Protocol[TransactionT]):
@@ -25,3 +32,12 @@ class IdempotentExecutor(Protocol[TransactionT]):
         payload: Mapping[str, Any],
         operation: Callable[[TransactionT], JsonObject],
     ) -> JsonObject: ...
+
+    def execute_with_status(
+        self,
+        actor_id: str,
+        scope: str,
+        key: str,
+        payload: Mapping[str, Any],
+        operation: Callable[[TransactionT], JsonObject],
+    ) -> ExecutionResult: ...

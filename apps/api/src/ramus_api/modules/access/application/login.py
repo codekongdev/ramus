@@ -26,6 +26,7 @@ from ramus_api.modules.access.application.ports import (
     SecretSource,
     SharedProjectProvider,
 )
+from ramus_api.modules.access.application.rate_limits import AuthRateLimiter
 from ramus_api.modules.access.application.sessions import IssuedSession, SessionIssuer
 from ramus_api.modules.access.domain.codes import (
     CodeVerdict,
@@ -48,18 +49,6 @@ EMAIL_CODE_SCOPE = "auth.email_code"
 VERIFY_SCOPE = "auth.verify"
 
 
-@dataclass
-class _PendingDelivery:
-    """Carries the plaintext code from the transaction to the mailer, never into storage.
-
-    Deliberately mutable: ``stored`` becomes true only when this request ran the operation. A replay
-    of the same key returns the stored response without running it, so no second mail is sent.
-    """
-
-    code: str = field(repr=False)
-    stored: bool = False
-
-
 def _stored_field(response: JsonObject, name: str) -> Any:
     if name not in response:
         raise ValueError(f"Stored login response is missing {name!r}")
@@ -77,25 +66,28 @@ class RequestEmailCode(Generic[T]):
     mailer: Mailer
     clock: Clock
     secrets: SecretSource
+    limits: AuthRateLimiter[T]
+    secret: str = field(repr=False)
 
-    async def __call__(self, email: str, key: str) -> datetime:
+    async def __call__(self, email: str, key: str, ip: str = "unknown") -> datetime:
         """Stores a new code and mails it. Returns when the next code may be requested.
 
         Raises ``AccessRejected`` (``AUTH_RATE_LIMITED``) within the resend interval. Mail goes out
         only after the receipt and code row commit, because the executor forbids external calls
         inside the operation. A mailer failure propagates (500); the stored code stays unused.
         """
-        pending = _PendingDelivery(self.secrets.new_code())
-        operation = partial(self._store_code, email, pending)
+        await asyncio.to_thread(self.limits.check, "request", email, ip)
+        code = self.secrets.new_code()
+        operation = partial(self._store_code, email, code)
         payload = {"email": email}
-        response = await asyncio.to_thread(
-            self.idempotency.execute_once, ANONYMOUS_ACTOR, EMAIL_CODE_SCOPE, key, payload, operation
+        result = await asyncio.to_thread(
+            self.idempotency.execute_with_status, ANONYMOUS_ACTOR, EMAIL_CODE_SCOPE, key, payload, operation
         )
-        if pending.stored:
-            await self.mailer.send_code(email, pending.code)
-        return _stored_datetime(response, "resend_available_at")
+        if not result.replayed:
+            await self.mailer.send_code(email, code)
+        return _stored_datetime(result.response, "resend_available_at")
 
-    def _store_code(self, email: str, pending: _PendingDelivery, transaction: T) -> JsonObject:
+    def _store_code(self, email: str, code: str, transaction: T) -> JsonObject:
         self.codes.lock_email(transaction, email)
         now = self.clock.now()
         last_created_at = self.codes.latest_created_at(transaction, email)
@@ -103,9 +95,8 @@ class RequestEmailCode(Generic[T]):
             available_at = to_iso_utc(resend_available_at(last_created_at))
             raise AccessRejected(AUTH_RATE_LIMITED, {"resend_available_at": available_at})
         code_id = new_id()
-        digest = hash_code(pending.code, str(code_id))
+        digest = hash_code(code, str(code_id), self.secret)
         self.codes.add(transaction, NewEmailCode(code_id, email, digest, now, code_expires_at(now)))
-        pending.stored = True
         return {"resend_available_at": to_iso_utc(resend_available_at(now))}
 
 
@@ -117,8 +108,10 @@ class VerifyEmailCode(Generic[T]):
     shared_project: SharedProjectProvider[T]
     issuer: SessionIssuer[T]
     clock: Clock
+    limits: AuthRateLimiter[T]
+    secret: str = field(repr=False)
 
-    def __call__(self, email: str, code: str, key: str) -> IssuedSession:
+    def __call__(self, email: str, code: str, key: str, ip: str = "unknown") -> IssuedSession:
         """Checks the code, joins the shared project, and issues a new session.
 
         The check returns its outcome as JSON instead of raising, so a failed attempt's counter
@@ -126,19 +119,22 @@ class VerifyEmailCode(Generic[T]):
 
         The session is issued in a separate transaction after the receipt commits, on every call
         including replays. A client that lost the first response and retries with the same key still
-        receives a cookie, as long as the code's validity window has not passed. Each replay creates
-        one more session; that is accepted because every session is a fresh 256-bit token that
-        expires on its own, and the window is bounded by the code's 10-minute lifetime.
+        receives a cookie, as long as the code's validity window has not passed. Replays are limited to three session issuances per receipt, including the original,
+        within the code's 10-minute lifetime.
         """
-        payload = {"email": email, "code": code}
+        self.limits.check("verify", email, ip)
+        payload = {"email": email, "code_hmac": hash_code(code, email, self.secret)}
         operation = partial(self._check_code, email, code)
         outcome = self.idempotency.execute_once(ANONYMOUS_ACTOR, VERIFY_SCOPE, key, payload, operation)
-        return self.issuer.issue(self._accepted_account(outcome))
+        account_id = self._accepted_account(outcome)
+        self.limits.check("session", email, ip, key=key)
+        return self.issuer.issue(account_id)
 
     def _check_code(self, email: str, code: str, transaction: T) -> JsonObject:
+        self.codes.lock_email(transaction, email)
         state = self.codes.lock_latest(transaction, email)
         now = self.clock.now()
-        verdict = judge_code(state, code, now)
+        verdict = judge_code(state, code, now, self.secret)
         if state is None or verdict is CodeVerdict.EXPIRED:
             return {"outcome": CodeVerdict.EXPIRED.value}
         if verdict is CodeVerdict.INVALID:

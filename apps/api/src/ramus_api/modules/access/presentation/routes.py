@@ -4,9 +4,7 @@ Login, logout, and ``GET /api/me`` are implemented (P0-A4). The AI connection en
 until task A3.
 """
 
-from typing import Annotated
-
-from fastapi import APIRouter, Depends, FastAPI, Request, Response
+from fastapi import APIRouter, FastAPI, Request, Response
 from sqlalchemy.orm import Session
 
 from ramus_api.container import AppContainer
@@ -18,7 +16,6 @@ from ramus_api.modules.access.presentation.cookies import (
     read_session_token,
     set_session_cookie,
 )
-from ramus_api.modules.access.presentation.current_account import AuthenticatedAccount, require_account
 from ramus_api.modules.access.presentation.dto import (
     Account,
     AiConnectionConnected,
@@ -30,7 +27,7 @@ from ramus_api.modules.access.presentation.dto import (
     RequestEmailCodeResponse,
     VerifyEmailCodeRequest,
 )
-from ramus_api.modules.access.presentation.errors import access_errors
+from ramus_api.modules.access.presentation.errors import access_errors, unauthorized
 from ramus_api.shared.presentation.error_messages import not_implemented
 from ramus_api.shared.presentation.idempotency import IdempotencyKey
 from ramus_api.shared.presentation.schemas import EmptyRequest, EmptyResponse
@@ -45,7 +42,9 @@ def to_me(profile: MeProfile) -> Me:
     )
 
 
-def register(app: FastAPI, container: AppContainer, *, shared_project: SharedProjectProvider[Session]) -> None:
+def register(
+    app: FastAPI, container: AppContainer, *, shared_project: SharedProjectProvider[Session]
+) -> None:
     services = build_access_services(container, shared_project)
     router = APIRouter(prefix="/api", tags=["access"])
     _add_login_routes(router, container, services)
@@ -55,7 +54,6 @@ def register(app: FastAPI, container: AppContainer, *, shared_project: SharedPro
 
 def _add_login_routes(router: APIRouter, container: AppContainer, services: AccessServices) -> None:
     secure = container.settings.cookie_secure
-    CurrentAccount = Annotated[AuthenticatedAccount, Depends(require_account(container))]
 
     @router.post(
         "/auth/email-code",
@@ -63,17 +61,25 @@ def _add_login_routes(router: APIRouter, container: AppContainer, services: Acce
         response_model=RequestEmailCodeResponse,
         operation_id="requestEmailCode",
     )
-    async def request_email_code(body: RequestEmailCodeRequest, idempotency_key: IdempotencyKey):
+    async def request_email_code(
+        body: RequestEmailCodeRequest, idempotency_key: IdempotencyKey, request: Request
+    ):
         # The same response whether or not an account exists for the address.
         with access_errors():
-            available_at = await services.request_email_code(body.email, idempotency_key)
+            available_at = await services.request_email_code(
+                body.email, idempotency_key, request.client.host if request.client else "unknown"
+            )
         return RequestEmailCodeResponse(resend_available_at=available_at)
 
     @router.post("/auth/verify", response_model=Me, operation_id="verifyEmailCode")
-    def verify_email_code(body: VerifyEmailCodeRequest, idempotency_key: IdempotencyKey, response: Response):
+    def verify_email_code(
+        body: VerifyEmailCodeRequest, idempotency_key: IdempotencyKey, response: Response, request: Request
+    ):
         with access_errors():
-            issued = services.verify_email_code(body.email, body.code, idempotency_key)
-        set_session_cookie(response, issued.token, secure=secure)
+            issued = services.verify_email_code(
+                body.email, body.code, idempotency_key, request.client.host if request.client else "unknown"
+            )
+        set_session_cookie(response, issued.token, expires_at=issued.expires_at, secure=secure)
         return to_me(issued.me)
 
     @router.post("/auth/logout", response_model=EmptyResponse, operation_id="logout")
@@ -86,8 +92,11 @@ def _add_login_routes(router: APIRouter, container: AppContainer, services: Acce
         return EmptyResponse()
 
     @router.get("/me", response_model=Me, operation_id="getMe")
-    def get_me(account: CurrentAccount):
-        return to_me(services.profiles.get_me(account.account_id))
+    def get_me(request: Request):
+        profile = services.profiles.authenticated_me(read_session_token(request))
+        if profile is None:
+            raise unauthorized()
+        return to_me(profile)
 
 
 def _add_ai_connection_stubs(router: APIRouter) -> None:

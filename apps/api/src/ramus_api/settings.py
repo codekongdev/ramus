@@ -4,9 +4,10 @@ Environment variables take priority over ``.env``; a missing ``.env`` file is al
 Empty values are treated as unset.
 """
 
+import secrets
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -15,6 +16,7 @@ DEFAULT_API_PORT = 8000
 DEFAULT_WEB_PORT = 5173
 MIN_PORT = 1
 MAX_PORT = 65535
+_PROCESS_AUTH_SECRET = secrets.token_hex(32)
 
 
 class Settings(BaseSettings):
@@ -26,8 +28,16 @@ class Settings(BaseSettings):
         frozen=True,
     )
 
+    # Set a stable secret in deployed environments; the local fallback changes on process restart.
+    auth_secret: SecretStr = Field(
+        default=SecretStr(_PROCESS_AUTH_SECRET), min_length=32, validation_alias="RAMUS_AUTH_SECRET"
+    )
     database_url: str = DEFAULT_DATABASE_URL
-    api_port: int = Field(default=DEFAULT_API_PORT, ge=MIN_PORT, le=MAX_PORT, validation_alias="RAMUS_API_PORT")
-    web_port: int = Field(default=DEFAULT_WEB_PORT, ge=MIN_PORT, le=MAX_PORT, validation_alias="RAMUS_WEB_PORT")
+    api_port: int = Field(
+        default=DEFAULT_API_PORT, ge=MIN_PORT, le=MAX_PORT, validation_alias="RAMUS_API_PORT"
+    )
+    web_port: int = Field(
+        default=DEFAULT_WEB_PORT, ge=MIN_PORT, le=MAX_PORT, validation_alias="RAMUS_WEB_PORT"
+    )
     # Adds ``Secure`` to the session cookie. Turn on wherever the app is served over HTTPS.
     cookie_secure: bool = Field(default=False, validation_alias="RAMUS_COOKIE_SECURE")

@@ -6,10 +6,9 @@ from uuid import UUID
 
 from pydantic import AfterValidator, Field
 
-from ramus_api.modules.access.domain.email import normalize_email
+from ramus_api.modules.access.domain.email import MAX_EMAIL_LENGTH, normalize_email
 from ramus_api.shared.presentation.schemas import ApiRequest, ApiResponse
 
-MAX_EMAIL_LENGTH = 254
 MAX_API_KEY_LENGTH = 512
 
 AiConnectionStatus = Literal["none", "connected", "invalid"]
@@ -54,7 +53,7 @@ class RequestEmailCodeResponse(ApiResponse):
 
 class VerifyEmailCodeRequest(ApiRequest):
     email: EmailAddress
-    code: str = Field(pattern=r"^\d{6}$")
+    code: str = Field(pattern=r"^[0-9]{6}$")
 
 
 class ConnectAiRequest(ApiRequest):

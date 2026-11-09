@@ -1,13 +1,12 @@
 """The ``ramus_session`` cookie (docs/contracts.md 1.1)."""
 
-from fastapi import Request, Response
+from datetime import UTC, datetime
 
-from ramus_api.modules.access.domain.codes import SESSION_TTL
+from fastapi import Request, Response
 
 SESSION_COOKIE = "ramus_session"
 SESSION_COOKIE_PATH = "/"
 SESSION_COOKIE_SAMESITE = "lax"
-SESSION_MAX_AGE_SECONDS = int(SESSION_TTL.total_seconds())
 
 
 def read_session_token(request: Request) -> str | None:
@@ -15,11 +14,12 @@ def read_session_token(request: Request) -> str | None:
     return request.cookies.get(SESSION_COOKIE) or None
 
 
-def set_session_cookie(response: Response, token: str, *, secure: bool) -> None:
+def set_session_cookie(response: Response, token: str, *, expires_at: datetime, secure: bool) -> None:
     response.set_cookie(
         SESSION_COOKIE,
         token,
-        max_age=SESSION_MAX_AGE_SECONDS,
+        max_age=max(0, int((expires_at - datetime.now(UTC)).total_seconds())),
+        expires=expires_at,
         path=SESSION_COOKIE_PATH,
         secure=secure,
         httponly=True,

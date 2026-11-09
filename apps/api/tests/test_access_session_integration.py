@@ -71,7 +71,8 @@ def test_session_cookie_attributes(client: TestClient, mailer: FakeMailer) -> No
     assert "httponly" in cookie
     assert cookie["samesite"].lower() == "lax"
     assert cookie["path"] == "/"
-    assert cookie["max-age"] == str(SESSION_MAX_AGE)
+    assert SESSION_MAX_AGE - 5 <= int(cookie["max-age"]) <= SESSION_MAX_AGE
+    assert cookie["expires"]
     assert "secure" not in cookie
 
 
@@ -215,7 +216,9 @@ def test_codes_and_tokens_are_stored_only_as_hashes(
     assert token
     with app.state.container.database.transaction() as session:
         code_row = session.scalars(select(EmailCodeRow).where(EmailCodeRow.email == email)).one()
-        session_row = session.scalars(select(SessionRow).where(SessionRow.account_id == me["account"]["id"])).one()
+        session_row = session.scalars(
+            select(SessionRow).where(SessionRow.account_id == me["account"]["id"])
+        ).one()
     assert code not in code_row.code_hash
     assert session_row.token_hash != token
     assert stored_values_containing(app, code) == []

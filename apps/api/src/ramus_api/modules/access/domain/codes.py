@@ -50,8 +50,11 @@ def _sha256(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def hash_code(code: str, salt: str) -> str:
-    return _sha256(f"ramus.email-code:{salt}:{code}")
+def hash_code(code: str, salt: str, secret: str = "") -> str:
+    value = f"ramus.email-code:{salt}:{code}"
+    if secret:
+        return hmac.new(secret.encode(), value.encode(), hashlib.sha256).hexdigest()
+    return _sha256(value)
 
 
 def hash_session_token(token: str) -> str:
@@ -74,13 +77,13 @@ def can_resend(last_created_at: datetime | None, now: datetime) -> bool:
     return last_created_at is None or now >= resend_available_at(last_created_at)
 
 
-def judge_code(state: EmailCodeState | None, submitted: str, now: datetime) -> CodeVerdict:
+def judge_code(state: EmailCodeState | None, submitted: str, now: datetime, secret: str = "") -> CodeVerdict:
     """Checks ``submitted`` against the latest code. Usability is checked before the digest."""
     if state is None or state.consumed_at is not None:
         return CodeVerdict.EXPIRED
     if now >= state.expires_at or state.attempts >= MAX_CODE_ATTEMPTS:
         return CodeVerdict.EXPIRED
-    if hmac.compare_digest(hash_code(submitted, str(state.id)), state.code_hash):
+    if hmac.compare_digest(hash_code(submitted, str(state.id), secret), state.code_hash):
         return CodeVerdict.VERIFIED
     return CodeVerdict.INVALID
 

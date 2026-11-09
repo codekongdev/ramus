@@ -5,6 +5,9 @@ trimmed, lowercased, exactly one ``@``, non-empty local and domain parts, a dot 
 whitespace. Delivery itself is the real proof of ownership.
 """
 
+import unicodedata
+
+MAX_EMAIL_LENGTH = 254
 MAX_DISPLAY_NAME_LENGTH = 100
 _AT = "@"
 
@@ -19,7 +22,11 @@ class InvalidEmail(ValueError):
 def normalize_email(raw: str) -> str:
     """Returns the canonical form stored in ``account.email`` and ``email_code.email``."""
     email = raw.strip().lower()
-    if any(character.isspace() for character in email) or email.count(_AT) != 1:
+    if (
+        len(email) > MAX_EMAIL_LENGTH
+        or any(character.isspace() or unicodedata.category(character).startswith("C") for character in email)
+        or email.count(_AT) != 1
+    ):
         raise InvalidEmail()
     local, domain = email.split(_AT)
     if not local or not domain or "." not in domain:

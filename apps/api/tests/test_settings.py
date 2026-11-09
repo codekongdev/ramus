@@ -86,3 +86,18 @@ def test_invalid_cookie_secure_value_is_rejected(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setenv("RAMUS_COOKIE_SECURE", "sometimes")
     with pytest.raises(ValidationError):
         Settings(_env_file=None)
+
+
+def test_auth_secret_is_masked_and_read_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    secret = "test-only-synthetic-auth-secret-32-characters"
+    monkeypatch.setenv("RAMUS_AUTH_SECRET", secret)
+    settings = Settings(_env_file=None)
+    assert settings.auth_secret.get_secret_value() == secret
+    assert secret not in repr(settings)
+    assert secret not in settings.model_dump_json()
+
+
+def test_auth_secret_rejects_a_short_value(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RAMUS_AUTH_SECRET", "short")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)

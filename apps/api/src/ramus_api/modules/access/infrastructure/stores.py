@@ -102,8 +102,26 @@ class SqlAccountStore:
             return None
         return AccountProfile(row.id, row.email, row.display_name)
 
+    def project_ids(self, transaction: Session, account_id: UUID) -> list[UUID]:
+        return list(
+            transaction.scalars(
+                select(MembershipRow.project_id).where(MembershipRow.account_id == account_id)
+            )
+        )
+
+    def participants(self, transaction: Session, project_id: UUID) -> list[AccountProfile]:
+        rows = transaction.scalars(
+            select(AccountRow)
+            .join(MembershipRow, MembershipRow.account_id == AccountRow.id)
+            .where(MembershipRow.project_id == project_id)
+            .order_by(MembershipRow.created_at, AccountRow.id)
+        )
+        return [AccountProfile(row.id, row.email, row.display_name) for row in rows]
+
     def ai_connection_status(self, transaction: Session, account_id: UUID) -> AIConnectionStatus:
-        status = transaction.scalar(select(AIConnectionRow.status).where(AIConnectionRow.account_id == account_id))
+        status = transaction.scalar(
+            select(AIConnectionRow.status).where(AIConnectionRow.account_id == account_id)
+        )
         return AIConnectionStatus.NONE if status is None else AIConnectionStatus(status)
 
 
@@ -121,7 +139,9 @@ class SqlSessionStore:
         )
         transaction.flush()
 
-    def find_active(self, transaction: Session, token_hash: str, now: datetime) -> AuthenticatedAccount | None:
+    def find_active(
+        self, transaction: Session, token_hash: str, now: datetime
+    ) -> AuthenticatedAccount | None:
         statement = (
             select(SessionRow.id, AccountRow.id, AccountRow.email, AccountRow.display_name)
             .join(AccountRow, AccountRow.id == SessionRow.account_id)

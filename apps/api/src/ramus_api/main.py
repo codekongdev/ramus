@@ -14,8 +14,11 @@ from sqlalchemy.orm import Session
 
 from ramus_api.container import AppContainer, ModuleRegistrar
 from ramus_api.modules.access.application.ports import Mailer
+from ramus_api.modules.access.composition import build_authenticator
 from ramus_api.modules.access.infrastructure.mailer import LoggingMailer
+from ramus_api.modules.access.infrastructure.stores import SqlAccountStore
 from ramus_api.modules.access.presentation.routes import register as register_access
+from ramus_api.modules.access.public import MembershipReader
 from ramus_api.modules.conversations.presentation.routes import register as register_conversations
 from ramus_api.modules.execution.presentation.routes import register as register_execution
 from ramus_api.modules.projects.infrastructure.sample import (
@@ -50,7 +53,7 @@ class SharedSampleProject:
 MODULES: tuple[ModuleRegistrar, ...] = (
     register_system,
     partial(register_access, shared_project=SharedSampleProject()),
-    register_projects,
+    partial(register_projects, memberships=MembershipReader(SqlAccountStore())),
     register_conversations,
     register_execution,
     register_realtime,
@@ -68,6 +71,7 @@ def build_container(settings: Settings, mailer: Mailer | None = None) -> AppCont
         database=database,
         idempotency=SqlIdempotentExecutor(database),
         mailer=mailer if mailer is not None else LoggingMailer(),
+        authenticator=build_authenticator(database),
     )
 
 
