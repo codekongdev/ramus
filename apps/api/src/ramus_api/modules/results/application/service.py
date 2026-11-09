@@ -12,7 +12,7 @@ from ramus_api.modules.conversations.application.ports import (
 )
 from ramus_api.modules.conversations.application.summary_inputs import SummaryInputReader
 from ramus_api.modules.execution.application.ports import ContextProvider, RunRequester
-from ramus_api.modules.execution.application.summary_tasks import SummaryTaskReader
+from ramus_api.modules.execution.application.summary_tasks import SummaryTask, SummaryTaskReader
 from ramus_api.modules.execution.domain.models import ConversationContext, ResultInput, RunPurpose, RunRequest
 from ramus_api.modules.results.application.errors import rejected
 from ramus_api.modules.results.application.events import result_event
@@ -62,19 +62,23 @@ class ResultService:
         self._require(session, actor_id, revision.result_id)
         return revision
 
-    def summarize(self, session, actor_id: UUID, task_id: UUID) -> ResultRecord:
-        task = self.tasks.get(session, task_id, lock=True)
+    def require_task_access(self, session, actor_id: UUID, task_id: UUID, *, lock=False) -> tuple[SummaryTask, UUID]:
+        task = self.tasks.get(session, task_id, lock=lock)
         if task is None:
             raise rejected("NOT_FOUND")
         conversation = self.conversations.get_conversation(session, task.conversation_id)
         if conversation is None:
             raise rejected("NOT_FOUND")
         self.access.require_member(session, conversation.project_id, actor_id)
+        return task, conversation.project_id
+
+    def summarize(self, session, actor_id: UUID, task_id: UUID) -> ResultRecord:
+        task, project_id = self.require_task_access(session, actor_id, task_id, lock=True)
         if task.status != "ready":
             raise rejected("TASK_NOT_READY")
         result = self.repository.for_task(session, task_id)
         if result is None:
-            self.repository.create(session, new_id(), conversation.project_id, task.conversation_id,
+            self.repository.create(session, new_id(), project_id, task.conversation_id,
                                    task_id, task.title)
             result = self.repository.for_task(session, task_id)
             assert result is not None

@@ -37,6 +37,9 @@ def register(app: FastAPI, container: AppContainer) -> None:
 
     @router.post("/tasks/{task_id}/summaries", response_model=Result, operation_id="createTaskSummary")
     def create_task_summary(task_id: UUID, body: EmptyRequest, idempotency_key: IdempotencyKey, account: CurrentAccount):
+        # Stored responses must not grant access after project membership is revoked.
+        with container.database.transaction() as session:
+            service.require_task_access(session, account.account_id, task_id)
         return container.idempotency.execute_once(
             str(account.account_id), f"results.summary:{task_id}", idempotency_key, {},
             lambda session: result_dto(service.summarize(session, account.account_id, task_id)).model_dump(mode="json"),
@@ -56,6 +59,8 @@ def register(app: FastAPI, container: AppContainer) -> None:
     def save_result_revision(
         result_id: UUID, body: SaveResultRevisionRequest, idempotency_key: IdempotencyKey, account: CurrentAccount,
     ):
+        with container.database.transaction() as session:
+            service.get(session, account.account_id, result_id)
         return container.idempotency.execute_once(
             str(account.account_id), f"results.revision:{result_id}", idempotency_key, body.model_dump(mode="json"),
             lambda session: revision_dto(service.save(
