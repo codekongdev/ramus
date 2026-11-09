@@ -1,0 +1,82 @@
+/*
+ * WF-01 layout. Proportions follow the wireframe drawn at 1200px
+ * (top 54 · left 182 · right 260), scaled for the 1440px desktop target.
+ * Colors and borders come only from design-system variables.
+ */
+.app-shell {
+  --app-top-height: 64px;
+  --app-left-width: 220px;
+  --app-right-width: 312px;
+
+  display: grid;
+  grid-template-columns: var(--app-left-width) minmax(0, 1fr) var(--app-right-width);
+  grid-template-rows: var(--app-top-height) minmax(0, 1fr);
+  grid-template-areas:
+    "top top top"
+    "left center right";
+  height: 100dvh;
+  min-width: 1024px;
+  overflow: hidden;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.app-shell__top {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--spacing) * 4);
+  padding: 0 calc(var(--spacing) * 6);
+  background: var(--chrome);
+  border-bottom: var(--hairline) solid var(--chrome-border);
+}
+
+.app-shell__left {
+  grid-area: left;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing) * 6);
+  min-height: 0;
+  padding: calc(var(--spacing) * 5) calc(var(--spacing) * 3);
+  background: var(--chrome);
+  border-right: var(--hairline) solid var(--chrome-border);
+}
+
+.app-shell__center {
+  grid-area: center;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.app-shell__right {
+  grid-area: right;
+  display: grid;
+  /* WF-01~19 keep 공유받은 결과 at the same height (≈ 1/3 down the column) in every state. */
+  grid-template-rows: minmax(0, 1fr) minmax(0, 2fr);
+  gap: calc(var(--spacing) * 4);
+  min-height: 0;
+  padding: calc(var(--spacing) * 6) calc(var(--spacing) * 6);
+  border-left: var(--hairline) solid var(--chrome-border);
+}
+
+.app-shell__slot {
+  min-width: 0;
+}
+
+.app-shell__scroll {
+  min-height: 0;
+  overflow: auto;
+}
+
+.app-shell__left > .app-shell__scroll {
+  flex: 0 1 auto;
+}
+
+.app-shell__fill {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
