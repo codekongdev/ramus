@@ -6,5 +6,5 @@ export default defineConfig({
   server: {
     proxy: { '/api': { target: 'http://127.0.0.1:8000', changeOrigin: false } },
   },
-  test: { environment: 'node', include: ['tests/**/*.test.ts'] },
+  test: { environment: 'node', include: ['tests/**/*.test.{ts,tsx}'] },
 });

@@ -1,0 +1,43 @@
+/* App-level overrides on top of the vendored Ramus kit. Import AFTER @ramus/design-system/styles.css. */
+@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+@import "@fontsource-variable/inter";
+
+/*
+ * Fonts: Latin glyphs come from Inter, Hangul falls through to Pretendard.
+ * The kit declares --h-font-ui on `.ramus` (ramus.css) and applies it with `.ramus{font-family:var(--h-font-ui)}`.
+ * `.ramus[data-theme]` has higher specificity than the kit's `.ramus`, so this wins regardless of load order.
+ */
+.ramus,
+.ramus[data-theme] {
+  --h-font-ui: "Inter Variable", "Pretendard Variable", Pretendard, system-ui, -apple-system, sans-serif;
+}
+
+/* The dev catalog hardcodes `font-family: Inter, ...` on .hc-shell; route it through the same variable. */
+.ramus.hc-shell {
+  font-family: var(--h-font-ui);
+}
+
+body {
+  margin: 0;
+}
+
+.ui-root {
+  min-height: 100dvh;
+  background: var(--background);
+}
+
+/* Dialog extras (the kit has no footer / header-actions styling). */
+.ramus .ui-dialog-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.ramus .ui-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 24px;
+  border-top: var(--hairline, 1px) solid var(--border);
+}

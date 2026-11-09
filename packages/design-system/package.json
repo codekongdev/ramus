@@ -1,0 +1,25 @@
+{
+  "name": "@ramus/design-system",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Vendored Ramus design system kit (React 19 components + CSS). Consumed as source by Vite.",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css",
+    "./catalog": "./src/RamusCatalog.tsx"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  }
+}
