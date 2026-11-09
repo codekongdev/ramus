@@ -1,0 +1,134 @@
+/*
+ * 스킬·자료 modal (WF-10·14). Layout only; colors, type and radii come from the design system.
+ */
+.resources-modal {
+  width: min(640px, calc(100vw - 32px));
+}
+
+.resources-step {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing) * 4);
+  min-height: 360px;
+}
+
+.resources-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.resources-field {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing) * 1.5);
+}
+
+.resources-note,
+.resources-row__description,
+.resources-row__versions,
+.resources-row__selected {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.resources-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing) * 2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resources-results {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resources-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: calc(var(--spacing) * 4);
+  padding: calc(var(--spacing) * 3) 0;
+  border-bottom: var(--hairline, 1px) solid var(--border);
+}
+
+.resources-row__main {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(var(--spacing) * 3);
+  min-width: 0;
+}
+
+.resources-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing) * 0.5);
+  min-width: 0;
+}
+
+.resources-row__title {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing) * 2);
+  font-weight: 500;
+}
+
+.resources-row__title label {
+  cursor: pointer;
+}
+
+.resources-row__aside {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: calc(var(--spacing) * 1);
+}
+
+.resources-status {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing) * 2);
+  color: var(--muted-foreground);
+}
+
+.resources-alert > div > .hx-alert-description {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--spacing) * 2);
+}
+
+.resources-back {
+  align-self: flex-start;
+}
+
+.resources-heading {
+  margin: 0;
+  font-size: var(--text-lg, 1.125rem);
+  font-weight: 600;
+}
+
+.resources-instructions {
+  min-height: 160px;
+  resize: vertical;
+}
+
+.resources-footer {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--spacing) * 3);
+}
+
+.resources-footer__message {
+  flex: 1;
+  min-width: 0;
+}
