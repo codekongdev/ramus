@@ -25,6 +25,8 @@ IMPLEMENTED = frozenset({
     "listMessages", "postMessage", "streamProjectEvents",
     "listResources", "createResource", "listAppliedResources", "replaceAppliedResources",
     "getResource", "createResourceRevision",
+    "listConversationTasks", "getTask",
+    "createTaskSummary", "getResult", "getResultRevision", "saveResultRevision",
 })
 STUBS = tuple(e for e in CONTRACT_ENDPOINTS if e.operation_id not in IMPLEMENTED)
 
@@ -56,7 +58,7 @@ BODIES: dict[str, dict] = {
     },
     "replaceAppliedResources": {"revision_ids": [ID]},
     "createTaskSummary": {},
-    "saveResultRevision": {"base_version": 0, "conclusion": "conclusion"},
+    "saveResultRevision": {"base_version": 0, "conclusion": "conclusion", "source_run_id": ID},
     "shareResultRevision": {"conversation_ids": [ID]},
     "createConversationFromResult": {"result_revision_id": ID, "title": "Title"},
 }

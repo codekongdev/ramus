@@ -13,7 +13,7 @@ import './task-modal.css';
 export type TaskModalProps = {
   readonly taskId: string;
   readonly onClose: () => void;
-  readonly renderHeaderActions: (task: Task) => ReactNode;
+  readonly renderHeaderActions: (task: Task, nav: { readonly showResultTab: () => void }) => ReactNode;
   readonly renderResultTab: (task: Task, nav: { readonly closeModal: () => void }) => ReactNode;
   readonly client?: AppApi;
   readonly ensureAiConnection?: () => Promise<boolean>;
@@ -84,7 +84,7 @@ export function TaskModal({ taskId, onClose, renderHeaderActions, renderResultTa
 
   return (
     <Dialog open title={task?.title ?? messages.loadingTitle} onOpenChange={open => { if (!open) onClose(); }} className="task-modal"
-      headerActions={task && <><TaskStatusBadge status={task.status} />{task.status === 'ready' && renderHeaderActions(task)}</>}>
+      headerActions={task && <><TaskStatusBadge status={task.status} />{task.status === 'ready' && renderHeaderActions(task, { showResultTab: () => setTab('result') })}</>}>
       {state.loading && !task && <p role="status"><Spinner /> {messages.loading}</p>}
       {state.error && <div className="task-modal__error" role="alert"><p>{state.error}</p><Button variant="outline" disabled={state.loading} onClick={() => dispatch({ type: 'refresh' })}>{messages.retryLoad}</Button></div>}
       {state.mutationError && <p className="task-modal__error" role="alert">{state.mutationError}</p>}

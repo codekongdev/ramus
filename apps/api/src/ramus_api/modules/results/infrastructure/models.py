@@ -67,6 +67,7 @@ class ResultDraftRow(Base):
     run_id: Mapped[UUID] = mapped_column(ForeignKey("run.id"))
     message_from_seq: Mapped[int] = mapped_column(BigInteger)
     message_to_seq: Mapped[int] = mapped_column(BigInteger)
+    context_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     error_code: Mapped[str | None] = mapped_column(String(100))
     error_params: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

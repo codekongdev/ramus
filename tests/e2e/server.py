@@ -4,6 +4,7 @@ Only the randomly named test database is created/dropped; existing workspace dat
 The development mailer's output is consumed privately by the Playwright fixture.
 """
 
+import json
 import os
 import secrets
 import subprocess
@@ -15,6 +16,7 @@ import uvicorn
 from pydantic import SecretStr
 from ramus_api.main import create_app
 from ramus_api.modules.access.application.errors import AI_KEY_INVALID, AccessRejected
+from ramus_api.modules.execution.fakes.llm import FakeLLM
 from ramus_api.settings import Settings
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
@@ -51,6 +53,10 @@ def main() -> None:
                         "secret_key": SecretStr(urlsafe_b64encode(secrets.token_bytes(32)).decode()),
                     }),
                     ai_key_validator=TestAiKeyValidator(),
+                    llm_gateway=FakeLLM(work_json=json.dumps({
+                        "mode": "branch", "reply": "경쟁사 조사를 시작합니다.",
+                        "tasks": [{"title": "경쟁사 분석", "goal": "멤버십 정책 비교", "start_input": "멤버십 정책을 조사해 주세요."}],
+                    }, ensure_ascii=False)),
                 ),
                 host="127.0.0.1",
                 port=settings.api_port,
