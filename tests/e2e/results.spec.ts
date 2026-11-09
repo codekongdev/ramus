@@ -60,6 +60,7 @@ async function mockResults(page: Page, connected = true) {
       if (path === '/api/conversations/c1') return json(parent);
       if (path === '/api/conversations/child1') return json(conversation);
       if (path.endsWith('/messages')) return json({ items: path.includes('child1') ? [message] : [], next_after_seq: null });
+      if (path.endsWith('/inputs')) return json({ items: [] });
       if (path === '/api/results/result1' && result) return json(result);
       if (path.startsWith('/api/result-revisions/')) {
         const revision = revisions.get(path.split('/').at(-1)!);
@@ -285,7 +286,8 @@ test('conclusion reading preserves the parent draft, route and scroll and never 
   await taskDialog.getByRole('button', { name: '결론 보기', exact: true }).click();
   const reader = page.locator('dialog[open]');
   await expect(reader).toContainText('고정된 결론');
-  for (const name of ['새 대화 만들기', '다른 대화에 보내기']) await expect(reader.getByRole('button', { name, exact: true })).toBeDisabled();
+  await expect(reader.getByRole('button', { name: '새 대화 만들기', exact: true })).toBeDisabled();
+  await expect(reader.getByRole('button', { name: '다른 대화에 보내기', exact: true })).toBeEnabled();
   await expect(reader.getByRole('textbox')).toHaveCount(0);
   await expect(reader.getByText('출처 정보', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: 'artifacts/b5-conclusion-desktop.png', fullPage: true });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { api, type AppApi } from '../../lib/api';
 import { useStore } from '../../lib/mvi';
 import { Button, Dialog, Spinner } from '../../ui';
@@ -6,15 +6,18 @@ import { ConclusionView, type ConclusionActions } from './ConclusionView';
 import { makeConclusionEffectHandler } from './conclusionEffects';
 import { conclusionReducer, initialConclusionState } from './conclusionModel';
 import { resultMessages as messages } from './messages';
+import type { ResultRevision } from './contract';
 
 export type ResultRevisionDialogProps = ConclusionActions & {
   readonly revisionId: string;
   readonly onClose: () => void;
   readonly client?: AppApi;
+  /** App composition can replace the body with B6/B7 steps in this same dialog. */
+  readonly renderConclusion?: (revision: ResultRevision) => ReactNode;
 };
 
 /** Received conclusions and task results use the same fixed-revision reader. */
-export function ResultRevisionDialog({ revisionId, onClose, client = api, ...actions }: ResultRevisionDialogProps) {
+export function ResultRevisionDialog({ revisionId, onClose, client = api, renderConclusion, ...actions }: ResultRevisionDialogProps) {
   const handler = useMemo(() => makeConclusionEffectHandler(client), [client]);
   const [state, dispatch] = useStore(conclusionReducer, () => initialConclusionState(revisionId), handler);
   useEffect(() => { dispatch({ type: 'open', revisionId }); }, [dispatch, revisionId]);
@@ -27,6 +30,6 @@ export function ResultRevisionDialog({ revisionId, onClose, client = api, ...act
     {current && state.error && <div className="task-result__error" role="alert">
       <p>{state.error}</p><Button variant="outline" onClick={() => dispatch({ type: 'retry' })}>{messages.retryLoad}</Button>
     </div>}
-    {revision && <ConclusionView revision={revision} {...actions} />}
+    {revision && (renderConclusion ? renderConclusion(revision) : <ConclusionView revision={revision} {...actions} />)}
   </Dialog>;
 }
