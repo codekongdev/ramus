@@ -62,6 +62,7 @@ function setup(overrides: Partial<ProjectEventsOptions<TestEvent>> = {}) {
       return source;
     },
     timers: { setTimeout: globalThis.setTimeout.bind(globalThis), clearTimeout: (h) => globalThis.clearTimeout(h as never) },
+    checkSession: async () => false,
     random: () => 0,
     backoff: { baseMs: 1_000, maxMs: 8_000 },
     ...overrides,
@@ -69,6 +70,11 @@ function setup(overrides: Partial<ProjectEventsOptions<TestEvent>> = {}) {
   const latest = () => sources[sources.length - 1]!;
   return { connection, sources, latest, statuses, onEvent, onResync, onInvalidEvent };
 }
+
+const fakeTimers = () => ({
+  setTimeout: (cb: () => void, ms: number) => setTimeout(cb, ms),
+  clearTimeout: (h: unknown) => clearTimeout(h as never),
+});
 
 afterEach(() => {
   vi.useRealTimers();
@@ -96,25 +102,25 @@ describe('connectProjectEvents', () => {
     expect(onInvalidEvent).toHaveBeenCalledTimes(2);
   });
 
-  it('closes on error, reconnects with backoff and resyncs after reconnecting', () => {
+  it('closes on error, checks the session, reconnects with backoff and resyncs', async () => {
     vi.useFakeTimers();
-    const { sources, latest, statuses, onResync } = setup({
-      timers: { setTimeout: (cb, ms) => setTimeout(cb, ms), clearTimeout: (h) => clearTimeout(h as never) },
-    });
+    const checkSession = vi.fn(async () => false);
+    const { sources, latest, statuses, onResync } = setup({ checkSession, timers: fakeTimers() });
     latest().open();
     latest().fail();
     expect(sources[0]!.closed).toBe(true);
     expect(statuses.at(-1)).toBe('reconnecting');
+    expect(checkSession).toHaveBeenCalledTimes(1);
 
-    vi.advanceTimersByTime(499);
+    await vi.advanceTimersByTimeAsync(499);
     expect(sources).toHaveLength(1);
-    vi.advanceTimersByTime(1); // attempt 1: 1000ms ceiling, random 0 → 500ms
+    await vi.advanceTimersByTimeAsync(1); // attempt 1: 1000ms ceiling, random 0 → 500ms
     expect(sources).toHaveLength(2);
 
     latest().fail(); // attempt 2 → 1000ms
-    vi.advanceTimersByTime(999);
+    await vi.advanceTimersByTimeAsync(999);
     expect(sources).toHaveLength(2);
-    vi.advanceTimersByTime(1);
+    await vi.advanceTimersByTimeAsync(1);
     expect(sources).toHaveLength(3);
 
     latest().open();
@@ -122,26 +128,53 @@ describe('connectProjectEvents', () => {
     expect(statuses.at(-1)).toBe('open');
   });
 
-  it('ignores events from a source that has been replaced', () => {
+  it('stops reconnecting and notifies when the session has expired', async () => {
     vi.useFakeTimers();
-    const { sources, latest, onEvent } = setup({
-      timers: { setTimeout: (cb, ms) => setTimeout(cb, ms), clearTimeout: (h) => clearTimeout(h as never) },
+    const onUnauthorized = vi.fn();
+    const { sources, latest, statuses } = setup({
+      checkSession: async () => true,
+      onUnauthorized,
+      timers: fakeTimers(),
     });
     latest().open();
     latest().fail();
-    vi.advanceTimersByTime(500);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+    expect(statuses.at(-1)).toBe('unauthorized');
+    expect(sources).toHaveLength(1);
+  });
+
+  it('keeps retrying when the session check itself fails', async () => {
+    vi.useFakeTimers();
+    const { sources, latest } = setup({
+      checkSession: async () => {
+        throw new TypeError('Failed to fetch');
+      },
+      timers: fakeTimers(),
+    });
+    latest().fail();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(sources).toHaveLength(2);
+  });
+
+  it('ignores events from a source that has been replaced', async () => {
+    vi.useFakeTimers();
+    const { sources, latest, onEvent } = setup({ timers: fakeTimers() });
+    latest().open();
+    latest().fail();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(sources).toHaveLength(2);
     sources[0]!.emit('message.created', '{"id":"late"}');
     expect(onEvent).not.toHaveBeenCalled();
   });
 
-  it('close stops the stream and cancels a pending retry', () => {
+  it('close stops the stream and cancels a pending retry', async () => {
     vi.useFakeTimers();
-    const { connection, sources, latest, statuses } = setup({
-      timers: { setTimeout: (cb, ms) => setTimeout(cb, ms), clearTimeout: (h) => clearTimeout(h as never) },
-    });
+    const { connection, sources, latest, statuses } = setup({ timers: fakeTimers() });
     latest().fail();
+    await vi.advanceTimersByTimeAsync(0); // session check done, retry scheduled
     connection.close();
-    vi.advanceTimersByTime(60_000);
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(sources).toHaveLength(1);
     expect(sources[0]!.closed).toBe(true);
     expect(statuses.at(-1)).toBe('closed');

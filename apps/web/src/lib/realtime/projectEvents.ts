@@ -26,10 +26,7 @@ export interface Timers {
 
 export interface ProjectEventsOptions<E> {
   projectId: string;
-  /**
-   * Named SSE events to listen for. Until `src/lib/events.ts` is fixed by the contract
-   * (부록 B), callers pass the list themselves.
-   */
+  /** Named SSE events to listen for. The app uses `PROJECT_EVENT_TYPES` from `src/lib/events`. */
   eventTypes: readonly string[];
   /** Validates one event at the boundary. Throw to reject it; it is reported via `onInvalidEvent`. */
   decode: (type: string, data: string) => E;
@@ -37,6 +34,10 @@ export interface ProjectEventsOptions<E> {
   /** Re-read server state. Called on the first open and after every reconnect. */
   onResync: (reason: ResyncReason) => void;
   onStatus?: (status: ConnectionStatus) => void;
+  /** Called once when a failure turns out to be an expired session. Reconnecting stops. */
+  onUnauthorized?: () => void;
+  /** Resolves true when the session has expired. Defaults to `GET /api/me` → 401. */
+  checkSession?: (signal: AbortSignal) => Promise<boolean>;
   onInvalidEvent?: (type: string, data: string, error: unknown) => void;
   createEventSource?: (url: string) => EventSourceLike;
   timers?: Timers;
@@ -56,6 +57,18 @@ const defaultTimers: Timers = {
   clearTimeout: (handle) => globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>),
 };
 
+/**
+ * Network errors count as "not expired" so a server that is merely down keeps being retried.
+ */
+export async function isSessionExpired(signal: AbortSignal): Promise<boolean> {
+  try {
+    const response = await fetch('/api/me', { credentials: 'same-origin', signal });
+    return response.status === 401;
+  } catch {
+    return false;
+  }
+}
+
 export const reportInvalidEvent = (type: string, _data: string, error: unknown) => {
   // Payload is not logged: events may carry user content.
   console.error(`[realtime] rejected "${type}" event`, error);
@@ -73,6 +86,7 @@ export function connectProjectEvents<E>(options: ProjectEventsOptions<E>): Proje
   const random = options.random ?? Math.random;
   const backoff = options.backoff ?? defaultBackoff;
   const onInvalidEvent = options.onInvalidEvent ?? reportInvalidEvent;
+  const checkSession = options.checkSession ?? isSessionExpired;
   const url = projectEventsUrl(options.projectId);
 
   let source: EventSourceLike | null = null;
@@ -92,7 +106,7 @@ export function connectProjectEvents<E>(options: ProjectEventsOptions<E>): Proje
     retryHandle = null;
   };
 
-  const handleEffect: EffectHandler<ConnectionEffect, ConnectionIntent> = (effect, dispatch) => {
+  const handleEffect: EffectHandler<ConnectionEffect, ConnectionIntent> = (effect, dispatch, signal) => {
     switch (effect.type) {
       case 'open': {
         closeSource();
@@ -118,6 +132,16 @@ export function connectProjectEvents<E>(options: ProjectEventsOptions<E>): Proje
       }
       case 'close':
         closeSource();
+        return;
+      case 'checkSession': {
+        const { generation } = effect;
+        return checkSession(signal).then(
+          (expired) => dispatch({ type: 'sessionChecked', generation, expired }),
+          () => dispatch({ type: 'sessionChecked', generation, expired: false }),
+        );
+      }
+      case 'notifyUnauthorized':
+        options.onUnauthorized?.();
         return;
       case 'scheduleRetry': {
         cancelRetry();

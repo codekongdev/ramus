@@ -7,10 +7,20 @@ import { next, type Next } from '../mvi';
  * Each EventSource gets a `generation`. Intents from an older generation are ignored, so a
  * late `error`/`open` from a replaced connection cannot clobber the current state.
  * Every successful open asks for a resync: the server state is the source of truth and
- * events missed while disconnected are not replayed (roadmap 3장 실시간).
+ * events missed while disconnected are not replayed (contracts.md 4장, C4).
+ *
+ * EventSource cannot see HTTP status, so after a failure the session is checked first
+ * (`GET /api/me`). An expired session stops reconnecting; otherwise a retry is scheduled.
  */
 
-export type ConnectionStatus = 'idle' | 'connecting' | 'open' | 'reconnecting' | 'closed';
+export type ConnectionStatus =
+  | 'idle'
+  | 'connecting'
+  | 'open'
+  | 'reconnecting'
+  | 'closed'
+  /** The session expired. Terminal until `start` after a new login. */
+  | 'unauthorized';
 
 export interface ConnectionState {
   readonly status: ConnectionStatus;
@@ -24,6 +34,7 @@ export type ConnectionIntent =
   | { readonly type: 'start' }
   | { readonly type: 'opened'; readonly generation: number }
   | { readonly type: 'failed'; readonly generation: number }
+  | { readonly type: 'sessionChecked'; readonly generation: number; readonly expired: boolean }
   | { readonly type: 'retryDue'; readonly generation: number }
   | { readonly type: 'stop' };
 
@@ -32,6 +43,8 @@ export type ResyncReason = 'initial' | 'reconnect';
 export type ConnectionEffect =
   | { readonly type: 'open'; readonly generation: number }
   | { readonly type: 'close' }
+  | { readonly type: 'checkSession'; readonly generation: number }
+  | { readonly type: 'notifyUnauthorized' }
   | { readonly type: 'scheduleRetry'; readonly attempt: number; readonly generation: number }
   | { readonly type: 'cancelRetry' }
   | { readonly type: 'resync'; readonly reason: ResyncReason };
@@ -48,7 +61,9 @@ type Result = Next<ConnectionState, ConnectionEffect>;
 export function connectionReducer(state: ConnectionState, intent: ConnectionIntent): Result {
   switch (intent.type) {
     case 'start': {
-      if (state.status !== 'idle' && state.status !== 'closed') return next(state);
+      if (state.status !== 'idle' && state.status !== 'closed' && state.status !== 'unauthorized') {
+        return next(state);
+      }
       const generation = state.generation + 1;
       return next<ConnectionState, ConnectionEffect>(
         { ...state, status: 'connecting', attempt: 0, generation },
@@ -65,13 +80,31 @@ export function connectionReducer(state: ConnectionState, intent: ConnectionInte
     }
     case 'failed': {
       if (intent.generation !== state.generation) return next(state);
-      if (state.status === 'idle' || state.status === 'closed') return next(state);
-      const attempt = state.attempt + 1;
+      if (state.status !== 'connecting' && state.status !== 'open' && state.status !== 'reconnecting') {
+        return next(state);
+      }
+      // A new generation makes repeated errors from the closed source (and anything else
+      // still pointing at it) stale, so only one session check runs per failure.
+      const generation = state.generation + 1;
       return next<ConnectionState, ConnectionEffect>(
-        { ...state, status: 'reconnecting', attempt },
+        { ...state, status: 'reconnecting', attempt: state.attempt + 1, generation },
         { type: 'close' },
-        { type: 'scheduleRetry', attempt, generation: state.generation },
+        { type: 'checkSession', generation },
       );
+    }
+    case 'sessionChecked': {
+      if (intent.generation !== state.generation || state.status !== 'reconnecting') return next(state);
+      if (intent.expired) {
+        return next<ConnectionState, ConnectionEffect>(
+          { ...state, status: 'unauthorized', generation: state.generation + 1 },
+          { type: 'notifyUnauthorized' },
+        );
+      }
+      return next<ConnectionState, ConnectionEffect>(state, {
+        type: 'scheduleRetry',
+        attempt: state.attempt,
+        generation: state.generation,
+      });
     }
     case 'retryDue': {
       if (intent.generation !== state.generation || state.status !== 'reconnecting') return next(state);
@@ -80,6 +113,7 @@ export function connectionReducer(state: ConnectionState, intent: ConnectionInte
     }
     case 'stop': {
       if (state.status === 'idle' || state.status === 'closed') return next(state);
+      if (state.status === 'unauthorized') return next({ ...state, status: 'closed' });
       return next<ConnectionState, ConnectionEffect>(
         { ...state, status: 'closed', generation: state.generation + 1 },
         { type: 'close' },

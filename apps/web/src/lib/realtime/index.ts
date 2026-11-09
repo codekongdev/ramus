@@ -12,12 +12,25 @@ export type {
   ConnectionStatus,
   ResyncReason,
 } from './connection';
-export { connectProjectEvents, projectEventsUrl } from './projectEvents';
+export {
+  connectProjectEvents,
+  isSessionExpired,
+  projectEventsUrl,
+  reportInvalidEvent,
+} from './projectEvents';
 export type {
   EventSourceLike,
   ProjectEventsConnection,
   ProjectEventsOptions,
   Timers,
 } from './projectEvents';
-export { useProjectEvents } from './useProjectEvents';
-export type { UseProjectEventsOptions } from './useProjectEvents';
+export {
+  ProjectEventsProvider,
+  useProjectEventListener,
+  useProjectEventsStatus,
+  useResyncListener,
+} from './ProjectEventsProvider';
+export type {
+  ProjectEventsConnectionOptions,
+  ProjectEventsProviderProps,
+} from './ProjectEventsProvider';

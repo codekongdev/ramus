@@ -1,13 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   IDEMPOTENCY_HEADER,
+  NETWORK_ERROR_MESSAGE,
+  SYSTEM_ERROR_MESSAGE,
   createApiClient,
+  errorMessage,
+  hasErrorCode,
   isConflict,
   isUnauthorized,
   readErrorBody,
   toHttpError,
   toResult,
 } from '../../src/lib/api';
+
+type ErrorEnvelope = { error: { code: string; message: string; details: unknown } };
 
 // Test-only stand-in for the generated `paths` (P0-A3 will provide the real one).
 interface TestPaths {
@@ -17,7 +23,7 @@ interface TestPaths {
       parameters: { path: { id: string } };
       responses: {
         200: { content: { 'application/json': { id: string; title: string } } };
-        404: { content: { 'application/json': { detail: string } } };
+        404: { content: { 'application/json': ErrorEnvelope } };
       };
     };
   };
@@ -26,7 +32,7 @@ interface TestPaths {
       requestBody: { content: { 'application/json': { title: string } } };
       responses: {
         201: { content: { 'application/json': { id: string } } };
-        409: { content: { 'application/json': { error: { code: string; message: string } } } };
+        409: { content: { 'application/json': ErrorEnvelope } };
       };
     };
   };
@@ -82,23 +88,33 @@ describe('toResult', () => {
   });
 
   it('maps 4xx to a business error with code and message', async () => {
-    const { api } = setup(() => json(409, { error: { code: 'stale_revision', message: '다른 버전이 먼저 저장됐습니다' } }));
+    const { api } = setup(() =>
+      json(409, {
+        error: { code: 'VERSION_CONFLICT', message: '다른 버전이 먼저 저장됐습니다', details: { latest_version: 2 } },
+      }),
+    );
     const result = await toResult(api.POST('/api/items', { body: { title: 'a' } }));
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error).toMatchObject({
       kind: 'business',
       status: 409,
-      code: 'stale_revision',
+      code: 'VERSION_CONFLICT',
       message: '다른 버전이 먼저 저장됐습니다',
+      details: { latest_version: 2 },
     });
     expect(isConflict(result.error)).toBe(true);
+    expect(hasErrorCode(result.error, 'VERSION_CONFLICT')).toBe(true);
+    expect(errorMessage(result.error)).toBe('다른 버전이 먼저 저장됐습니다');
   });
 
   it('maps 5xx to a system error', async () => {
-    const { api } = setup(() => json(503, { detail: 'down' }));
+    const { api } = setup(() =>
+      json(503, { error: { code: 'SERVICE_UNAVAILABLE', message: '서비스를 잠시 사용할 수 없습니다.', details: null } }),
+    );
     const result = await toResult(api.GET('/api/items/{id}', { params: { path: { id: 'x' } } }));
-    expect(result).toMatchObject({ ok: false, error: { kind: 'system', status: 503, message: 'down' } });
+    expect(result).toMatchObject({ ok: false, error: { kind: 'system', status: 503, code: 'SERVICE_UNAVAILABLE' } });
+    if (!result.ok) expect(errorMessage(result.error)).toBe(SYSTEM_ERROR_MESSAGE);
   });
 
   it('maps a thrown fetch to a network error', async () => {
@@ -107,6 +123,7 @@ describe('toResult', () => {
     });
     const result = await toResult(api.GET('/api/items/{id}', { params: { path: { id: 'x' } } }));
     expect(result).toMatchObject({ ok: false, error: { kind: 'network' } });
+    if (!result.ok) expect(errorMessage(result.error)).toBe(NETWORK_ERROR_MESSAGE);
   });
 
   it('maps an aborted request to aborted', async () => {
@@ -115,17 +132,28 @@ describe('toResult', () => {
     });
     const result = await toResult(api.GET('/api/items/{id}', { params: { path: { id: 'x' } } }));
     expect(result).toEqual({ ok: false, error: { kind: 'aborted' } });
+    if (!result.ok) expect(errorMessage(result.error)).toBeNull();
   });
 });
 
 describe('error helpers', () => {
-  it('reads the supported error body shapes', () => {
-    expect(readErrorBody({ error: { code: 'c', message: 'm' } })).toEqual({ code: 'c', message: 'm' });
-    expect(readErrorBody({ code: 'c', message: 'm' })).toEqual({ code: 'c', message: 'm' });
-    expect(readErrorBody({ detail: 'd' })).toEqual({ code: null, message: 'd' });
-    expect(readErrorBody({ detail: [{ msg: 'x' }] })).toEqual({ code: null, message: null });
-    expect(readErrorBody('oops')).toEqual({ code: null, message: null });
-    expect(readErrorBody(undefined)).toEqual({ code: null, message: null });
+  it('accepts only the contract error envelope', () => {
+    expect(readErrorBody({ error: { code: 'C', message: 'm', details: [1] } })).toEqual({
+      code: 'C',
+      message: 'm',
+      details: [1],
+    });
+    expect(readErrorBody({ error: { code: 'C', message: 'm' } })).toEqual({ code: 'C', message: 'm', details: null });
+    const empty = { code: null, message: null, details: null };
+    expect(readErrorBody({ code: 'C', message: 'm' })).toEqual(empty);
+    expect(readErrorBody({ detail: 'd' })).toEqual(empty);
+    expect(readErrorBody({ error: { code: 1, message: 'm' } })).toEqual(empty);
+    expect(readErrorBody('<html>Bad Gateway</html>')).toEqual(empty);
+    expect(readErrorBody(undefined)).toEqual(empty);
+  });
+
+  it('falls back to the common message for a business error without an envelope', () => {
+    expect(errorMessage(toHttpError(404, 'not json'))).toBe(SYSTEM_ERROR_MESSAGE);
   });
 
   it('classifies status helpers', () => {

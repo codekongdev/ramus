@@ -3,7 +3,6 @@ import { StrictMode, act, createElement, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { next, useStore, type EffectHandler, type Reducer } from '../../src/lib/mvi';
-import { useProjectEvents, type EventSourceLike } from '../../src/lib/realtime';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -72,53 +71,5 @@ describe('useStore', () => {
     expect(seen.every((signal) => signal.aborted)).toBe(true);
     await act(async () => finish());
     expect(container.textContent).toBe('gone');
-  });
-});
-
-describe('useProjectEvents', () => {
-  it('connects per project, reports status and closes on unmount', () => {
-    const sources: (EventSourceLike & { url: string; closed: boolean })[] = [];
-    const createEventSource = (url: string) => {
-      const source = {
-        url,
-        closed: false,
-        onopen: null as ((event: Event) => void) | null,
-        onerror: null as ((event: Event) => void) | null,
-        addEventListener: () => {},
-        close() {
-          this.closed = true;
-        },
-      };
-      sources.push(source);
-      return source;
-    };
-    const onResync = vi.fn();
-    function Probe({ projectId }: { projectId: string | null }) {
-      const status = useProjectEvents(projectId, {
-        eventTypes: ['message.created'],
-        decode: (_type, data) => data,
-        onEvent: () => {},
-        onResync,
-        createEventSource,
-      });
-      return createElement('p', null, status);
-    }
-
-    act(() => root.render(createElement(Probe, { projectId: null })));
-    expect(container.textContent).toBe('idle');
-    expect(sources).toHaveLength(0);
-
-    act(() => root.render(createElement(Probe, { projectId: 'p1' })));
-    expect(container.textContent).toBe('connecting');
-    act(() => sources[0]!.onopen?.(new Event('open')));
-    expect(container.textContent).toBe('open');
-    expect(onResync).toHaveBeenCalledWith('initial');
-
-    act(() => root.render(createElement(Probe, { projectId: 'p2' })));
-    expect(sources[0]!.closed).toBe(true);
-    expect(sources[1]!.url).toBe('/api/projects/p2/events');
-
-    act(() => root.render(createElement('p')));
-    expect(sources[1]!.closed).toBe(true);
   });
 });

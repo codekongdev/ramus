@@ -7,6 +7,10 @@ export {
 } from './client';
 export type { ApiClientOptions } from './client';
 export {
+  NETWORK_ERROR_MESSAGE,
+  SYSTEM_ERROR_MESSAGE,
+  errorMessage,
+  hasErrorCode,
   isConflict,
   isNotFound,
   isUnauthorized,
@@ -14,4 +18,4 @@ export {
   toHttpError,
   toThrownError,
 } from './result';
-export type { ApiError, ApiResult } from './result';
+export type { ApiError, ApiResult, KnownErrorCode } from './result';

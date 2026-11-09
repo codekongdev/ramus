@@ -10,6 +10,15 @@ import {
 const run = (intents: ConnectionIntent[], from: ConnectionState = initialConnectionState) =>
   intents.reduce((state, intent) => connectionReducer(state, intent).state, from);
 
+// start(g1) → opened → failed(g2, check) → session ok(retry g2) → retryDue(open g3)
+const afterOneDrop: ConnectionIntent[] = [
+  { type: 'start' },
+  { type: 'opened', generation: 1 },
+  { type: 'failed', generation: 1 },
+  { type: 'sessionChecked', generation: 2, expired: false },
+  { type: 'retryDue', generation: 2 },
+];
+
 describe('connectionReducer', () => {
   it('start opens generation 1', () => {
     const result = connectionReducer(initialConnectionState, { type: 'start' });
@@ -31,32 +40,50 @@ describe('connectionReducer', () => {
     expect(result.effects).toEqual([{ type: 'resync', reason: 'initial' }]);
   });
 
-  it('failure closes the source and schedules a retry with a growing attempt', () => {
+  it('failure closes the source and checks the session before retrying', () => {
     const open = run([{ type: 'start' }, { type: 'opened', generation: 1 }]);
-    const first = connectionReducer(open, { type: 'failed', generation: 1 });
-    expect(first.state).toMatchObject({ status: 'reconnecting', attempt: 1, generation: 1 });
-    expect(first.effects).toEqual([
-      { type: 'close' },
-      { type: 'scheduleRetry', attempt: 1, generation: 1 },
+    const failed = connectionReducer(open, { type: 'failed', generation: 1 });
+    expect(failed.state).toMatchObject({ status: 'reconnecting', attempt: 1, generation: 2 });
+    expect(failed.effects).toEqual([{ type: 'close' }, { type: 'checkSession', generation: 2 }]);
+
+    const checked = connectionReducer(failed.state, { type: 'sessionChecked', generation: 2, expired: false });
+    expect(checked.state).toBe(failed.state);
+    expect(checked.effects).toEqual([{ type: 'scheduleRetry', attempt: 1, generation: 2 }]);
+
+    const retried = connectionReducer(checked.state, { type: 'retryDue', generation: 2 });
+    expect(retried.state).toMatchObject({ status: 'reconnecting', generation: 3 });
+    expect(retried.effects).toEqual([{ type: 'open', generation: 3 }]);
+
+    const again = connectionReducer(retried.state, { type: 'failed', generation: 3 });
+    expect(again.state.attempt).toBe(2);
+  });
+
+  it('an expired session stops reconnecting', () => {
+    const failed = run([{ type: 'start' }, { type: 'failed', generation: 1 }]);
+    const result = connectionReducer(failed, { type: 'sessionChecked', generation: 2, expired: true });
+    expect(result.state).toMatchObject({ status: 'unauthorized', generation: 3 });
+    expect(result.effects).toEqual([{ type: 'notifyUnauthorized' }]);
+    expect(connectionReducer(result.state, { type: 'retryDue', generation: 2 }).effects).toEqual([]);
+  });
+
+  it('can start again after an expired session (new login)', () => {
+    const unauthorized = run([
+      { type: 'start' },
+      { type: 'failed', generation: 1 },
+      { type: 'sessionChecked', generation: 2, expired: true },
     ]);
+    const restarted = connectionReducer(unauthorized, { type: 'start' });
+    expect(restarted.state).toMatchObject({ status: 'connecting', attempt: 0, generation: 4 });
+    expect(restarted.effects).toEqual([{ type: 'open', generation: 4 }]);
+  });
 
-    const retried = connectionReducer(first.state, { type: 'retryDue', generation: 1 });
-    expect(retried.state).toMatchObject({ status: 'reconnecting', generation: 2 });
-    expect(retried.effects).toEqual([{ type: 'open', generation: 2 }]);
-
-    const second = connectionReducer(retried.state, { type: 'failed', generation: 2 });
-    expect(second.state.attempt).toBe(2);
-    expect(second.effects).toContainEqual({ type: 'scheduleRetry', attempt: 2, generation: 2 });
+  it('a repeated error from the closed source does not start a second check', () => {
+    const failed = run([{ type: 'start' }, { type: 'failed', generation: 1 }]);
+    expect(connectionReducer(failed, { type: 'failed', generation: 1 })).toEqual({ state: failed, effects: [] });
   });
 
   it('reopening after a drop requests a reconnect resync and resets attempts', () => {
-    const state = run([
-      { type: 'start' },
-      { type: 'opened', generation: 1 },
-      { type: 'failed', generation: 1 },
-      { type: 'retryDue', generation: 1 },
-    ]);
-    const result = connectionReducer(state, { type: 'opened', generation: 2 });
+    const result = connectionReducer(run(afterOneDrop), { type: 'opened', generation: 3 });
     expect(result.state).toMatchObject({ status: 'open', attempt: 0 });
     expect(result.effects).toEqual([{ type: 'resync', reason: 'reconnect' }]);
   });
@@ -65,23 +92,21 @@ describe('connectionReducer', () => {
     const state = run([
       { type: 'start' },
       { type: 'failed', generation: 1 },
-      { type: 'retryDue', generation: 1 },
+      { type: 'sessionChecked', generation: 2, expired: false },
+      { type: 'retryDue', generation: 2 },
     ]);
-    expect(connectionReducer(state, { type: 'opened', generation: 2 }).effects).toEqual([
+    expect(connectionReducer(state, { type: 'opened', generation: 3 }).effects).toEqual([
       { type: 'resync', reason: 'initial' },
     ]);
   });
 
   it('ignores intents from a replaced generation', () => {
-    const state = run([
-      { type: 'start' },
-      { type: 'failed', generation: 1 },
-      { type: 'retryDue', generation: 1 },
-    ]);
+    const state = run(afterOneDrop);
     for (const intent of [
-      { type: 'opened', generation: 1 },
+      { type: 'opened', generation: 2 },
       { type: 'failed', generation: 1 },
-      { type: 'retryDue', generation: 1 },
+      { type: 'retryDue', generation: 2 },
+      { type: 'sessionChecked', generation: 2, expired: true },
     ] as const) {
       expect(connectionReducer(state, intent)).toEqual({ state, effects: [] });
     }
@@ -90,9 +115,9 @@ describe('connectionReducer', () => {
   it('stop closes, cancels the retry and invalidates pending intents', () => {
     const reconnecting = run([{ type: 'start' }, { type: 'failed', generation: 1 }]);
     const stopped = connectionReducer(reconnecting, { type: 'stop' });
-    expect(stopped.state).toMatchObject({ status: 'closed', generation: 2 });
+    expect(stopped.state).toMatchObject({ status: 'closed', generation: 3 });
     expect(stopped.effects).toEqual([{ type: 'close' }, { type: 'cancelRetry' }]);
-    expect(connectionReducer(stopped.state, { type: 'retryDue', generation: 1 }).effects).toEqual([]);
+    expect(connectionReducer(stopped.state, { type: 'sessionChecked', generation: 2, expired: false }).effects).toEqual([]);
     expect(connectionReducer(stopped.state, { type: 'stop' }).effects).toEqual([]);
   });
 
