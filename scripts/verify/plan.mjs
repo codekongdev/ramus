@@ -40,7 +40,7 @@ export const STEPS = [
   },
   // roadmap 9.3 rule 3: screen text lives in each feature's messages.ts, not in .tsx files.
   { id: 'i18n:hangul', area: 'i18n', run: { tool: 'node', args: ['scripts/verify/hangul.mjs'] } },
-  { id: 'scripts:test', area: 'scripts', run: { tool: 'node', args: ['--test', 'scripts/verify/*.test.mjs'] } },
+  { id: 'scripts:test', area: 'scripts', run: { tool: 'node', args: ['--test', 'scripts/verify/*.test.mjs', 'tests/e2e/support/*.test.mjs'] } },
 ];
 
 export const AREAS = [...new Set(STEPS.map((step) => step.area))];

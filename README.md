@@ -75,3 +75,15 @@ pnpm verify --list              # 단계 목록
 `i18n:hangul`은 `apps/web/src/features`의 `.tsx`에 한글 문구가 있으면 실패한다. 화면 문구는 기능 폴더의 `messages.ts`에 둔다(로드맵 9.3).
 uv가 없거나 Postgres가 꺼져 있으면 그 단계는 SKIP이다.
 SKIP은 통과가 아니므로 종료 코드 1을 돌려준다. 실행하지 못한 것을 알고 넘어갈 때만 `--allow-skip`을 붙인다.
+
+## E2E
+
+```sh
+pnpm db:up
+pnpm exec playwright install chromium   # 처음 한 번
+pnpm e2e
+```
+
+`pnpm e2e`는 E2E 전용 서버를 직접 띄우고 끝나면 내린다. API는 8100, 웹은 5273 포트를 쓰므로 개발 서버(8000·5173)와 겹치지 않는다(`RAMUS_E2E_API_PORT`, `RAMUS_E2E_WEB_PORT`로 변경).
+DB는 같은 Postgres의 `ramus_e2e`를 쓴다. 없으면 만들고 마이그레이션한다. 개발용 DB는 건드리지 않는다.
+계정은 `tests/e2e/support/fixtures.ts`의 `loginAs('이름')`으로 만든다. 계정마다 브라우저 컨텍스트가 따로 열리고, 개발용 메일러가 API 로그(`artifacts/e2e/api.log`)에 남긴 인증 코드로 로그인한다.
