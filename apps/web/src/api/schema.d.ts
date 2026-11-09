@@ -89,6 +89,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/conversations/{conversation_id}/inputs/{input_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Conversation Input */
+        get: operations["getConversationInput"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/conversations/{conversation_id}/messages": {
         parameters: {
             query?: never;
@@ -713,7 +730,7 @@ export interface components {
             id: string;
             /**
              * Latest Version
-             * @description Current latest version of the source result.
+             * @description Latest source version visible to this account; pinned version when source access is restricted.
              */
             latest_version: number;
             /**
@@ -731,6 +748,56 @@ export interface components {
              * Format: uuid
              */
             result_revision_id: string;
+            /** Title */
+            title: string;
+            /** Version */
+            version: number;
+        };
+        /** ConversationInputDetail */
+        ConversationInputDetail: {
+            /** Conclusion */
+            conclusion: string;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Latest Version
+             * @description Latest source version visible to this account; pinned version when source access is restricted.
+             */
+            latest_version: number;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "share" | "new_conversation";
+            /**
+             * Result Id
+             * Format: uuid
+             */
+            result_id: string;
+            /**
+             * Result Revision Id
+             * Format: uuid
+             */
+            result_revision_id: string;
+            source: components["schemas"]["ResultRevisionSource"];
             /** Title */
             title: string;
             /** Version */
@@ -1608,6 +1675,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationInputList"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getConversationInput: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                input_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationInputDetail"];
                 };
             };
             /** @description Client error */

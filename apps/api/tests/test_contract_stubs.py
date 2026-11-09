@@ -80,6 +80,7 @@ def _url(endpoint: Endpoint) -> str:
         "resource_id",
         "result_id",
         "result_revision_id",
+        "input_id",
     ):
         path = path.replace("{" + name + "}", ID)
     return path

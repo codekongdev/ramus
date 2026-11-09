@@ -27,6 +27,7 @@ CONTRACT_SCHEMAS = (
     "Result",
     "ResultRevision",
     "ConversationInput",
+    "ConversationInputDetail",
 )
 
 
@@ -145,3 +146,10 @@ def test_every_list_wrapper_is_an_items_object(schemas: dict) -> None:
     for name, schema in wrappers.items():
         assert "items" in schema["properties"], name
         assert schema["properties"]["items"]["type"] == "array", name
+
+
+def test_conversation_input_detail_adds_only_pinned_contents(schemas: dict) -> None:
+    base = schemas["ConversationInput"]["properties"]
+    detail = schemas["ConversationInputDetail"]["properties"]
+    assert set(detail) == set(base) | {"conclusion", "source"}
+    assert detail["source"] == {"$ref": "#/components/schemas/ResultRevisionSource"}

@@ -15,6 +15,7 @@ from ramus_api.modules.results.public import ResultReader
 from ramus_api.modules.sharing.application.service import SharingService
 from ramus_api.modules.sharing.infrastructure.repository import SqlSharingRepository
 from ramus_api.modules.sharing.presentation.dto import (
+    ConversationInputDetail,
     ConversationInputList,
     CreateConversationFromResultRequest,
     ShareOutcomeList,
@@ -64,6 +65,14 @@ def register(app: FastAPI, container: AppContainer) -> None:
                 {**asdict(item.pinned), "latest_version": item.latest_version}
                 for item in service.received(session, account.account_id, conversation_id)
             ])
+
+    @router.get(
+        "/conversations/{conversation_id}/inputs/{input_id}",
+        response_model=ConversationInputDetail,
+        operation_id="getConversationInput",
+    )
+    def get_conversation_input(conversation_id: UUID, input_id: UUID):
+        raise not_implemented()
 
     @router.post(
         "/projects/{project_id}/conversations/from-result",

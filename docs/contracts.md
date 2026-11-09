@@ -1,4 +1,4 @@
-# ramus 계약 v1.7
+# ramus 계약 v1.8
 
 확정일: 2026-11-09 · 작업자: 메이슨, 헤이든 · 상태: 확정
 
@@ -112,6 +112,7 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 | `Result` | `id`, `project_id`, `title`, `source_conversation_id`, `source_task_id`, `latest_version \| null`, `latest_revision_id \| null`, `draft: ResultDraft \| null`, `revisions: [{id, version, saved_by, created_at}]` |
 | `ResultRevision` | `id`, `result_id`, `version`, `title`, `conclusion`, `source: {conversation_id, message_from_seq, message_to_seq, resource_revision_ids, input_result_revision_ids, run_id}`, `saved_by`, `created_at` |
 | `ConversationInput` | `id`, `conversation_id`, `result_id`, `result_revision_id`, `version`, `title`, `latest_version`(원본 결과의 현재 최신 버전), `origin: "share" \| "new_conversation"`, `created_by`, `created_at` |
+| `ConversationInputDetail` | `ConversationInput`에 `conclusion`, `source: ResultRevisionSource`를 더한 고정 입력 스냅샷. 원본 프로젝트 권한이 없는 수신자에게 `latest_version`은 받은 버전으로 제한 |
 
 ## 3. 엔드포인트
 
@@ -160,6 +161,7 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 | `GET /api/projects/{project_id}/results` | | `{items: [{result_id, title, latest_version, latest_revision_id, source_conversation_title, updated_at}]}` | 결과물 목록(조회 전용). 저장된 결과만 |
 | `POST /api/result-revisions/{id}/shares` | `{conversation_ids: string[]}` | `{items: [{conversation_id, outcome: "linked" \| "replaced" \| "unchanged" \| "kept_newer"}]}` | 대상별로 Share와 ConversationInput을 함께 만든다. 새 버전이면 교체(D8), 같은 버전이면 변경 없음, 대상에 더 새 버전이 이미 있으면 유지 |
 | `GET /api/conversations/{id}/inputs` | | `{items: ConversationInput[]}` | 오른쪽 공유받은 결과 목록. 이 대화의 AI 입력과 같다 |
+| `GET /api/conversations/{id}/inputs/{input_id}` | | `ConversationInputDetail` | 수신 대화 참여 권한과 해당 입력 ID를 확인해 저장된 본문·출처 스냅샷만 반환. 원본의 다른 버전·대화·자료 접근 권한은 부여하지 않음 |
 | `POST /api/projects/{project_id}/conversations/from-result` | `{result_revision_id, title}` | `Conversation` | 대상 프로젝트 최상위에 생성하고 결론 버전 스냅샷을 입력으로 연결(origin `new_conversation`) |
 
 ## 4. 실시간 이벤트(SSE)
@@ -365,6 +367,7 @@ export type TaskModalProps = {
 
 | 날짜 | 버전 | 내용 |
 |---|---|---|
+| 2026-11-09 | v1.8 | B7: 받은 결론에서 후속 대화를 시작할 고정 입력 상세 조회 추가. 제한된 수신자의 원본 최신 버전 메타데이터 노출 방지 |
 | 2026-11-09 | v1.7 | B4 추가 검수: 긴 정리의 구간별 추출·종합 한도 실패 코드 `SUMMARY_LIMIT_EXCEEDED` 추가. 정리·승인 멱등 재전송에서도 현재 참여 권한을 확인 |
 | 2026-11-09 | v1.6 | B4: 정리 요청 시점 입력 고정용 `result_draft.context_snapshot`, 승인 저장의 필수 `source_run_id` 추가. 기준 버전이 같아도 재생성된 초안과 다른 출처로 편집 본문을 저장하면 409 |
 | 2026-11-09 | v1.5 | A5 work 입력의 메시지 범위, 현재 업무 Run의 Task 상태·이벤트 동기화, 대화 입력·Task 결과 조회 포트(6장·6.2). HTTP·SSE 페이로드와 테이블 스키마는 변경하지 않음 |
