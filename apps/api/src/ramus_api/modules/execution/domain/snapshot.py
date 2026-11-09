@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from typing import Any
 from uuid import UUID
 
-from ramus_api.modules.execution.domain.models import ConversationContext, RunInputSnapshot
+from ramus_api.modules.execution.domain.models import ConversationContext, LlmRequest, RunInputSnapshot
 
 EMPTY_SNAPSHOT = RunInputSnapshot()
 
@@ -12,12 +12,13 @@ _SEQ_KEYS = ("message_from_seq", "message_to_seq")
 _ID_KEYS = ("resource_revision_ids", "input_result_revision_ids")
 
 
-def snapshot_from_context(context: ConversationContext) -> RunInputSnapshot:
-    """Pins the revision IDs the run actually reads. Bodies are never part of the snapshot.
-
-    The message range is unknown to the current ports and stays empty until the work handler lands.
-    """
+def snapshot_from_context(
+    context: ConversationContext, request: LlmRequest | None = None
+) -> RunInputSnapshot:
+    """Pins the message range and revision IDs actually read; never stores bodies."""
     return RunInputSnapshot(
+        message_from_seq=request.message_from_seq if request is not None else None,
+        message_to_seq=request.message_to_seq if request is not None else None,
         resource_revision_ids=tuple(item.revision_id for item in context.resources),
         input_result_revision_ids=tuple(item.result_revision_id for item in context.results),
     )

@@ -1,4 +1,4 @@
-# ramus 계약 v1.4
+# ramus 계약 v1.5
 
 확정일: 2026-11-09 · 작업자: 메이슨, 헤이든 · 상태: 확정
 
@@ -290,8 +290,9 @@ class ResultUsageQuery(Protocol):
 핸들러를 구현할 때 아래 동작을 전제로 한다.
 
 - `ContextProvider.snapshot`은 점유 트랜잭션에서 한 번 호출되고, 그 결과가 `build_request`의 `context`로 그대로 넘어간다(5장).
+- `LlmRequest.message_from_seq`·`message_to_seq`는 선택적 입력 범위다. work 핸들러는 원래 요청의 `run_id`까지 메시지를 읽고 이 범위를 반환한다. 실행기는 같은 점유 트랜잭션에서 자료·결론 버전 ID와 함께 기록한다.
 - `fail`은 실행 상태를 failed로 바꾸는 트랜잭션 안에서 호출된다. 시작하지 않은 실행(`RUN_TIMED_OUT`)과 heartbeat가 끊긴 실행(`RUN_INTERRUPTED`)에도 호출된다. `fail`이 예외를 던지면 핸들러의 쓰기만 롤백되고 실행은 failed로 남는다.
-- 취소할 때는 핸들러를 호출하지 않고 `run.updated`만 발행한다.
+- 취소할 때는 핸들러를 호출하지 않는다. `run.updated`를 발행하고, Task에 연결된 현재 업무 Run이면 Task 상태와 `task.updated`도 같은 트랜잭션에서 반영한다. 결과 정리 Run은 업무 Task 상태를 바꾸지 않는다.
 - 취소되었거나 복구 처리된 실행에 늦게 도착한 모델 결과는 버리며, 이때 `complete`는 호출되지 않는다.
 
 ### 6.1 모델 출력 스키마
@@ -312,6 +313,8 @@ class ResultUsageQuery(Protocol):
 |---|---|---|---|
 | `CredentialProvider.get_api_key(account_id)` | access | execution | 실행 직전에만 키를 복호화해 돌려준다. 로그·이벤트에 남기지 않는다 |
 | `ConversationWriter.append_message(...)`, `create_child(...)` | conversations | execution | AI 답변 저장, 분기 시 자식 대화 생성 |
+| `WorkInputReader.read(session, conversation_id, run_id)`, `lock_parent(...)` | conversations | execution | 원래 실행 요청까지의 이력과 대화 식별 정보 조회, 분기 트랜잭션의 부모 잠금 |
+| `TaskResultQuery.for_task(session, task_id)` | results | execution | 상태 이벤트에서 기존 결과 ID 연결 유지 |
 | `AiConnectionQuery.is_connected(session, account_id)` | access | execution | 실행을 등록하거나 재시도할 때 키 연결 여부만 확인한다. execution은 `ai_connection` 테이블을 직접 읽지 않는다 |
 
 ## 7. 프론트엔드 연결 규칙
@@ -361,6 +364,7 @@ export type TaskModalProps = {
 
 | 날짜 | 버전 | 내용 |
 |---|---|---|
+| 2026-11-09 | v1.5 | A5 work 입력의 메시지 범위, 현재 업무 Run의 Task 상태·이벤트 동기화, 대화 입력·Task 결과 조회 포트(6장·6.2). HTTP·SSE 페이로드와 테이블 스키마는 변경하지 않음 |
 | 2026-11-09 | v1.4 | A1: 참여자 조회, 인증 입력 검증, 이메일·IP 시간당 상한, HMAC과 세션 재발급 상한 |
 | 2026-11-09 | v1 | 최초 확정. P0-A1·P0-B1에서 정해진 항목을 반영 |
 | 2026-11-09 | v1.2 | P0-A3 구현에 맞춰 보완: 실제 이름은 `contracts/openapi.json` 기준, 빈 본문 변경 요청, `NOT_IMPLEMENTED`, 빈 보낼 대상 목록의 오류 코드 |

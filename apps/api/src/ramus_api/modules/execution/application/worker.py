@@ -148,6 +148,12 @@ class RunWorker:
                 if pinned is None:
                     raise RuntimeError("Claimed run left running before its inputs were pinned")
                 request = handler.build_request(session, pinned.view, context)
+                if request.message_from_seq is not None:
+                    pinned = self._deps.store.save_snapshot(
+                        session, state.id, state.attempt, snapshot_from_context(context, request)
+                    )
+                    if pinned is None:
+                        raise RuntimeError("Claimed run left running before its messages were pinned")
         except Exception as error:  # noqa: BLE001 - becomes a failed run, the savepoint is rolled back
             logger.error("Run preparation failed: run_id=%s error=%s", state.id, type(error).__name__)
             return ClaimedRun(state, None, failure_from_exception(error))

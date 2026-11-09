@@ -3,6 +3,7 @@
 from datetime import datetime
 from typing import Any
 
+from ramus_api.modules.execution.application.branch_ports import TaskLifecycle
 from ramus_api.modules.execution.application.config import Clock
 from ramus_api.modules.execution.application.relay import EventRelay, LoopSignal
 from ramus_api.modules.execution.application.runtime_ports import TransactionHooks
@@ -38,15 +39,21 @@ class RunAnnouncer:
         relay: EventRelay,
         clock: Clock,
         wakeup: LoopSignal | None = None,
+        task_lifecycle: TaskLifecycle[Any] | None = None,
     ) -> None:
         self._hooks = hooks
         self._relay = relay
         self._clock = clock
         self._wakeup = wakeup
+        self._tasks = task_lifecycle
 
     def changed(self, session: Any, state: RunState) -> None:
         event = run_updated_event(state, self._clock())
         self._hooks.after_commit(session, lambda: self._relay.enqueue(event))
+        if self._tasks is not None:
+            task_event = self._tasks.project(session, state, self._clock())
+            if task_event is not None:
+                self._hooks.after_commit(session, lambda: self._relay.enqueue(task_event))
 
     def queued(self, session: Any) -> None:
         """Lets an idle worker claim a new pending run without waiting for the next poll."""

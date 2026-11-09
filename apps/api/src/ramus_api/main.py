@@ -7,6 +7,7 @@ There is no module-level app; servers use the factory (``uvicorn --factory ramus
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
+from dataclasses import replace
 from functools import partial
 from uuid import UUID
 
@@ -22,14 +23,19 @@ from ramus_api.modules.access.infrastructure.project_access import SqlAiConnecti
 from ramus_api.modules.access.infrastructure.stores import SqlAccountStore
 from ramus_api.modules.access.presentation.routes import register as register_access
 from ramus_api.modules.access.public import MembershipReader
+from ramus_api.modules.conversations.composition import CommittedEvents
+from ramus_api.modules.conversations.infrastructure.repository import SqlConversationRepository
+from ramus_api.modules.conversations.infrastructure.writer import SqlConversationWriter
 from ramus_api.modules.conversations.presentation.routes import register as register_conversations
 from ramus_api.modules.execution.application.events import RunAnnouncer
+from ramus_api.modules.execution.application.ports import LlmGateway
 from ramus_api.modules.execution.application.registration import RunRegistrationService
 from ramus_api.modules.execution.application.relay import EventRelay
 from ramus_api.modules.execution.infrastructure.commit_hooks import SqlAlchemyTransactionHooks
 from ramus_api.modules.execution.infrastructure.queries import SqlRunReader
 from ramus_api.modules.execution.infrastructure.run_store import SqlRunStore
 from ramus_api.modules.execution.presentation.routes import register as register_execution
+from ramus_api.modules.execution.work_composition import build_work_execution_runtime
 from ramus_api.modules.projects.infrastructure.sample import (
     SHARED_SAMPLE_PROJECT_ID,
     ensure_shared_sample_project,
@@ -37,6 +43,7 @@ from ramus_api.modules.projects.infrastructure.sample import (
 from ramus_api.modules.projects.presentation.routes import register as register_projects
 from ramus_api.modules.realtime.infrastructure.broker import InProcessEventBroker
 from ramus_api.modules.realtime.presentation.routes import register as register_realtime
+from ramus_api.modules.resources.infrastructure.context_provider import build_context_provider
 from ramus_api.modules.resources.presentation.routes import register as register_resources
 from ramus_api.modules.results.presentation.routes import register as register_results
 from ramus_api.modules.sharing.presentation.routes import register as register_sharing
@@ -75,7 +82,11 @@ MODULES: tuple[ModuleRegistrar, ...] = (
 
 
 def build_container(
-    settings: Settings, mailer: Mailer | None = None, ai_key_validator: AiKeyValidator | None = None
+    settings: Settings,
+    mailer: Mailer | None = None,
+    ai_key_validator: AiKeyValidator | None = None,
+    *,
+    llm_gateway: LlmGateway | None = None,
 ) -> AppContainer:
     """``mailer`` defaults to the development ``LoggingMailer``, which prints codes to the server log."""
     database = Database(settings.database_url)
@@ -84,7 +95,7 @@ def build_container(
     requester = RunRegistrationService(
         SqlRunStore(), SqlAiConnectionQuery(), RunAnnouncer(hooks, relay, utc_now)
     )
-    return AppContainer(
+    container = AppContainer(
         settings=settings,
         database=database,
         idempotency=SqlIdempotentExecutor(database),
@@ -98,6 +109,17 @@ def build_container(
         run_reader=SqlRunReader(),
         ai_key_validator=ai_key_validator if ai_key_validator is not None else OpenAiKeyValidator(settings.openai_model),
     )
+    if llm_gateway is None:
+        return container
+    runtime = build_work_execution_runtime(
+        transaction=database.transaction,
+        publisher=events,
+        gateway=llm_gateway,
+        context_provider=build_context_provider(),
+        connections=SqlAiConnectionQuery(),
+        writer=SqlConversationWriter(SqlConversationRepository(), CommittedEvents(container)),
+    )
+    return replace(container, run_requester=runtime.requester, execution_runtime=runtime)
 
 
 def create_app(
@@ -105,16 +127,26 @@ def create_app(
     *,
     mailer: Mailer | None = None,
     ai_key_validator: AiKeyValidator | None = None,
+    llm_gateway: LlmGateway | None = None,
 ) -> FastAPI:
     """Builds the app without connecting to the database; connections open on first use."""
-    container = build_container(settings or Settings(), mailer, ai_key_validator)
+    container = build_container(settings or Settings(), mailer, ai_key_validator, llm_gateway=llm_gateway)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         relay_task = asyncio.create_task(container.event_relay.run_forever(idle_timeout=1))
+        worker_task = (
+            asyncio.create_task(container.execution_runtime.worker.run_forever())
+            if container.execution_runtime is not None else None
+        )
         try:
             yield
         finally:
+            if worker_task is not None:
+                worker_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await worker_task
+                await container.execution_runtime.relay.flush()
             relay_task.cancel()
             with suppress(asyncio.CancelledError):
                 await relay_task
