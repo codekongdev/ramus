@@ -1,5 +1,8 @@
 """Composition root tests that need no database."""
 
+import asyncio
+from threading import Event
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -8,6 +11,9 @@ from ramus_api.container import AppContainer
 from ramus_api.modules import system
 from ramus_api.modules.access.fakes.services import FakeMailer
 from ramus_api.modules.access.infrastructure.mailer import LoggingMailer
+from ramus_api.modules.execution.application.worker import RunWorker
+from ramus_api.modules.execution.infrastructure.summary_gateway import OpenAiGateway
+from ramus_api.modules.results.application.long_summary import LongSummaryGateway
 from ramus_api.settings import Settings
 
 UNREACHABLE_DATABASE_URL = "postgresql+psycopg://nobody:nothing@127.0.0.1:1/nowhere"
@@ -15,10 +21,36 @@ UNREACHABLE_DATABASE_URL = "postgresql+psycopg://nobody:nothing@127.0.0.1:1/nowh
 
 def test_create_app_does_not_connect_to_the_database() -> None:
     settings = Settings(_env_file=None, database_url=UNREACHABLE_DATABASE_URL)
-    with TestClient(main.create_app(settings)) as client:
+    # Construction stays lazy; entering lifespan now starts the database-backed worker.
+    app = main.create_app(settings)
+    client = TestClient(app)
+    try:
         response = client.get("/api/health")
+    finally:
+        client.close()
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_default_runtime_has_real_gateway_and_lifespan_starts_and_stops_it(monkeypatch, no_implicit_model_worker) -> None:
+    started, stopped = Event(), Event()
+    monkeypatch.setattr(main, "default_gateway", no_implicit_model_worker)
+
+    async def worker_loop(worker: RunWorker) -> None:
+        assert isinstance(worker._deps.gateway, LongSummaryGateway)
+        assert isinstance(worker._deps.gateway._gateway, OpenAiGateway)
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            stopped.set()
+
+    monkeypatch.setattr(RunWorker, "run_forever", worker_loop)
+    settings = Settings(_env_file=None, database_url=UNREACHABLE_DATABASE_URL)
+    with TestClient(main.create_app(settings)) as client:
+        assert client.get("/api/health").status_code == 200
+        assert started.wait(1)
+    assert stopped.is_set()
 
 
 def test_modules_are_registered_from_a_single_tuple() -> None:

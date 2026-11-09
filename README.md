@@ -94,8 +94,15 @@ so clients must refetch state when a connection opens and retrieve messages afte
 The current broker runs within a single API process. Running multiple processes requires a shared transport adapter.
 
 Messages containing `@AI` are saved together with a registered run. If the requester has no AI connection or the same conversation
-already has an active run, the API returns 409 without saving the message. The app currently supports registering pending runs;
-actual model calls require wiring together the AI connection, input assembly, purpose-specific handlers, and worker.
+already has an active run, the API returns 409 without saving the message. The default app starts the work executor and calls
+the configured OpenAI model with the requester's encrypted account key.
+Responses are validated against a purpose-specific JSON schema before they are saved. A parent request can create up to four
+independent child tasks; child requests cannot branch again. Task queue/detail, cancellation, and retry endpoints are connected
+to the same executor. Project participants can view tasks; control requires both the task and current run to belong to the requester.
+
+Resource registration and version management, result summarization and approval, pinned conclusion sharing, follow-up conversations,
+the saved result library, project switching, and the relationship map are connected to the product UI.
+Long summaries use a bounded map/reduce gateway around the same account-scoped adapter. The standalone `demo/` is a separate scripted prototype.
 
 ## Project switching and creation (A8)
 
@@ -121,6 +128,9 @@ Integration tests fail if PostgreSQL is not running. Add `-m "not integration"` 
 Run the sign-in browser tests with `pnpm test:e2e`. Before the first run, install the browser with `pnpm exec playwright install chromium`.
 The tests create and migrate a temporary database, start the API and web servers on available ports, and clean up the servers and temporary database when finished.
 Codes printed by the development mailer are read only within the fixture; no real email is sent. Resend tests wait for the actual 60-second rate limit to expire.
+The browser test server injects a deterministic model gateway and a synthetic key validator. Its worker, database, API, and SSE
+remain real; it never calls OpenAI. The connected MVP flow is covered by `tests/e2e/mvp-workflow.spec.ts`;
+task cancellation and retry are covered by `tests/e2e/work-execution.spec.ts`. See [execution integration](docs/live-work-execution.md).
 
 ## Full verification
 

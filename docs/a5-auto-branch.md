@@ -14,7 +14,11 @@
 | `context_provider` | resources/sharing(B3) | 적용된 자료·결론의 고정 버전 조회, 자료 적용 목록 복사 |
 | `writer` | conversations(A2) | `ConversationWriter`: 자식 대화와 AI·시스템 메시지 저장, 커밋 후 대화·메시지 이벤트 예약 |
 
-반환한 runtime의 `requester`를 대화 서비스에 넘기고, 앱 수명주기에서 `runtime.worker.run_forever()`를 시작·종료한다. 대화 writer와 실행기는 같은 이벤트 발행기를 사용한다. `create_app(..., llm_gateway=...)`는 A2의 실제 대화 writer와 B3의 실제 ContextProvider를 조립하고 worker를 시작한다. 실제 A3 게이트웨이가 아직 연결되지 않은 기본 앱은 실행기를 시작하지 않는다. FakeLLM은 테스트에서만 명시적으로 주입하며 기본 모델로 쓰지 않는다. Task 조회·취소·재시도 HTTP 스텁의 교체는 별도 작업이다.
+반환한 runtime의 `requester`를 대화 서비스에 넘기고, 앱 수명주기에서 `runtime.worker.run_forever()`를 시작·종료한다. 대화 writer와 실행기는 같은 이벤트 발행기를 사용한다. 기본 `create_app()`은 `OpenAiGateway`를 감싼 `LongSummaryGateway`, 업무·결과 정리 핸들러, A2의 실제 대화 writer, B3의 실제 ContextProvider를 조립하고 worker를 시작한다. 앱 객체 생성은 DB에 연결하지 않지만 수명주기를 시작하면 worker가 DB를 조회한다.
+
+게이트웨이는 access의 공개 `CredentialProvider`로 실행 요청자의 현재 키를 읽고, DB 트랜잭션을 닫은 뒤 Responses API를 호출한다. `OPENAI_MODEL`과 엄격한 JSON 스키마를 보내고 `store: false`를 지정한다. 응답 거절·불완전 응답·스키마 위반과 제공자 오류는 안전한 실행 오류로 변환하며 키나 제공자 본문을 저장하거나 로그에 남기지 않는다. API 키 등록에는 기존과 같이 `RAMUS_SECRET_KEY`가 필요하다. 가짜 응답은 `create_app(..., llm_gateway=...)`로 테스트에서만 명시적으로 주입한다.
+
+Task 목록·상세·취소·재시도 HTTP API도 같은 runtime에 연결된다. 프로젝트 참여자는 작업을 읽을 수 있고, 변경은 Task 요청자와 현재 업무 Run 요청자가 모두 일치해야 한다. 다른 계정이 보완 요청을 실행한 동안 원 Task 요청자는 그 계정의 Run을 중단하거나 다시 실행할 수 없다. 변경 요청은 멱등 키를 사용하고, 조회·변경·receipt 재생 전에 프로젝트 권한을 검사한다.
 
 ## 입력과 분기
 
@@ -37,4 +41,12 @@ uv run --project apps/api ruff check apps/api
 uv run --project apps/api pytest
 ```
 
-통합 테스트는 `conftest.py`가 만든 `ramus_test_*` 임시 DB를 사용한다. F-02의 여섯 사례는 FakeLLM에 정해 둔 출력을 통한 계약 검사이며, 실제 모델의 의미 판정 정확도 평가는 별도로 필요하다. 실제 키·모델 호출과 브라우저 E2E는 이 로컬 검증에 포함하지 않는다.
+통합 테스트는 `conftest.py`가 만든 `ramus_test_*` 임시 DB를 사용한다. `test_live_gateway_integration.py`는 계정 키 저장·복호화, 기본 게이트웨이 조립, 자료 v1 고정, worker 완료까지 확인하고 제공자 HTTP만 대체한다. F-02의 여섯 사례는 FakeLLM에 정해 둔 출력을 통한 계약 검사이며, 실제 모델의 의미 판정 정확도 평가는 별도로 필요하다. 실제 키·모델 호출은 로컬 검증에 포함하지 않는다.
+
+브라우저에서 응답·분기·작업 큐·중단·재시도·부모 초안 유지·새로고침 후 저장 상태를 확인한다.
+
+```sh
+pnpm exec playwright test tests/e2e/work-execution.spec.ts
+```
+
+이 테스트는 임시 DB와 실제 API·worker·SSE를 쓰고 모델 응답만 결정적으로 주입한다. 수명주기가 필요 없는 라우터 단위 테스트는 worker를 시작하지 않아 개발 DB에 접근하지 않는다.

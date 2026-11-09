@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import threading
+from collections.abc import Callable
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,20 @@ class InFlightCalls:
             entry = self._calls.get(run_id)
         if entry is None:
             return False
+        return self._abort(entry, run_id)
+
+    def capture_abort(self, run_id: UUID) -> Callable[[], bool]:
+        """Capture the current Future before commit; a later attempt must never be cancelled.
+
+        Row locks serialize cancel/retry, but their commit hooks may run in a different order.
+        Holding the exact Future here preserves the cancellation target across that gap.
+        """
+        with self._lock:
+            entry = self._calls.get(run_id)
+        return lambda: False if entry is None else self._abort(entry, run_id)
+
+    @staticmethod
+    def _abort(entry: tuple[asyncio.AbstractEventLoop, asyncio.Future[object]], run_id: UUID) -> bool:
         loop, call = entry
         try:
             loop.call_soon_threadsafe(call.cancel)

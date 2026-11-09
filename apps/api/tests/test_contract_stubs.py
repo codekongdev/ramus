@@ -1,7 +1,4 @@
-"""Stub routes fail with 501 NOT_IMPLEMENTED; the Idempotency-Key header is checked first.
-
-Implemented endpoints leave the 501 check but keep the Idempotency-Key check.
-"""
+"""All contract routes are implemented and validate change-request headers before use."""
 
 from __future__ import annotations
 
@@ -25,7 +22,7 @@ IMPLEMENTED = frozenset({
     "listMessages", "postMessage", "streamProjectEvents",
     "listResources", "createResource", "listAppliedResources", "replaceAppliedResources",
     "getResource", "createResourceRevision",
-    "listConversationTasks", "getTask",
+    "listConversationTasks", "getTask", "cancelTask", "retryTask",
     "createTaskSummary", "getResult", "getResultRevision", "saveResultRevision", "listProjectResults",
     "shareResultRevision", "listConversationInputs", "createConversationFromResult", "getConversationInput",
 })
@@ -97,14 +94,8 @@ def _ids(endpoints) -> list[str]:
     return [e.operation_id for e in endpoints]
 
 
-@pytest.mark.parametrize("endpoint", STUBS, ids=_ids(STUBS))
-def test_every_stub_returns_501_with_a_korean_message(client: TestClient, endpoint: Endpoint) -> None:
-    response = _send(client, endpoint, KEY if endpoint.is_change else {})
-    assert response.status_code == 501
-    error = response.json()["error"]
-    assert error["code"] == "NOT_IMPLEMENTED"
-    assert error["details"] is None
-    assert any("가" <= ch <= "힣" for ch in error["message"])
+def test_all_contract_routes_have_implementations() -> None:
+    assert not STUBS
 
 
 @pytest.mark.parametrize(
@@ -112,7 +103,7 @@ def test_every_stub_returns_501_with_a_korean_message(client: TestClient, endpoi
     [e for e in CONTRACT_ENDPOINTS if e.is_change],
     ids=_ids([e for e in CONTRACT_ENDPOINTS if e.is_change]),
 )
-def test_change_routes_check_the_idempotency_key_before_501(client: TestClient, endpoint: Endpoint) -> None:
+def test_change_routes_check_the_idempotency_key_first(client: TestClient, endpoint: Endpoint) -> None:
     response = _send(client, endpoint, {})
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "IDEMPOTENCY_KEY_INVALID"

@@ -35,7 +35,9 @@ def no_implicit_model_worker(monkeypatch):
     """Tests opt into execution by injecting FakeLLM; production credentials are never used."""
     from ramus_api import main
 
+    production_gateway = main.default_gateway
     monkeypatch.setattr(main, "default_gateway", lambda _container: None)
+    return production_gateway
 
 
 def _render(url: URL) -> str:

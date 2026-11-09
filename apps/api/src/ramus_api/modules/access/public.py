@@ -1,7 +1,9 @@
 """Supported access interface for feature modules and explicit sample preparation."""
 
+from ramus_api.modules.access.application.errors import AccessRejected as AccessRejected
 from ramus_api.modules.access.application.memberships import MembershipReader as MembershipReader
 from ramus_api.modules.access.application.memberships import MembershipWriter as MembershipWriter
+from ramus_api.modules.access.application.ports import CredentialProvider as CredentialProvider
 from ramus_api.modules.access.application.ports import TransactionFactory as TransactionFactory
 from ramus_api.modules.access.domain.models import AccountProfile as AccountProfile
 from ramus_api.modules.access.infrastructure.sample import ensure_example_author as ensure_example_author
