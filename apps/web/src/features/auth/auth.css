@@ -3,10 +3,8 @@
 .auth-brand { font-size: 24px; font-weight: 650; letter-spacing: -0.04em; margin-bottom: 48px; }
 .auth-card h1 { margin: 0 0 14px; font-size: clamp(24px, 5vw, 30px); font-weight: 550; letter-spacing: -0.04em; line-height: 1.35; }
 .auth-description { margin: 0 0 32px; color: var(--muted-foreground); line-height: 1.7; overflow-wrap: anywhere; }
-.auth-form, .auth-code-field { display: grid; gap: 16px; }
+.auth-form { display: grid; gap: 16px; }
 .auth-form input { min-height: 48px; font-size: 16px; }
-.auth-code-field { gap: 12px; }
-.auth-code-field > label { font-size: 14px; font-weight: 500; }
 .auth-submit { width: 100%; min-height: 48px; }
 .auth-actions { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .auth-actions button { min-height: 44px; }
@@ -21,3 +19,28 @@
 .auth-account { display: flex; align-items: center; gap: 8px; }
 .auth-account-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .auth-project-name { font-size: 14px; font-weight: 550; }
+
+.auth-password-field { display: grid; gap: 4px; }
+.auth-password-toggle { justify-self: end; min-height: 44px; }
+.auth-switch { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 20px; color: var(--muted-foreground); font-size: 14px; }
+.auth-switch button { min-height: 44px; }
+.auth-error p { margin: 0; }
+.auth-error ul { margin: 8px 0 0; padding-left: 20px; }
+.auth-error a { color: inherit; text-underline-offset: 3px; }
+@media (max-width: 480px) {
+  .auth-page { padding: calc(var(--spacing) * 5); }
+  .auth-brand { margin-bottom: 28px; }
+  .auth-description { margin-bottom: 24px; }
+}
+
+.auth-password-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; line-height: 1.5; }
+.auth-password-status:empty { display: none; }
+.auth-password-status-error { display: flex; flex-direction: column; max-width: 280px; color: var(--destructive); }
+.auth-password-status button { min-height: 44px; }
+.ui-dialog.auth-password-dialog { max-width: 460px; }
+.auth-password-dialog .auth-description { margin-bottom: 20px; }
+@media (max-width: 720px) {
+  .auth-participants { flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+  .auth-account { flex-wrap: wrap; justify-content: flex-end; }
+  .auth-password-status-error { max-width: min(280px, 70vw); }
+}

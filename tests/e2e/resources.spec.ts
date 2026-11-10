@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import type { components } from '../../apps/web/src/api/schema';
-import { test, expect, requestLoginCode, finishLogin } from './fixtures';
+import { test, expect, registerAccount } from './fixtures';
 
 type ResourceDetail = components['schemas']['ResourceDetail'];
 type AppliedResourceList = components['schemas']['AppliedResourceList'];
@@ -12,9 +12,8 @@ const modal = (page: Page) => page.getByRole('dialog', { name: '스킬·자료',
 const selected = (page: Page) => modal(page).getByRole('list', { name: '선택한 스킬·자료', exact: true });
 const row = (page: Page, resourceId: string) => modal(page).locator(`[data-resource-id="${resourceId}"]`);
 
-async function createConversation(page: Page, email: string, codeFor: (email: string) => Promise<string>) {
-  await requestLoginCode(page, email);
-  await finishLogin(page, await codeFor(email));
+async function createConversation(page: Page, email: string) {
+  await registerAccount(page, email);
   const profile = await page.request.get('/api/me');
   expect(profile.ok()).toBe(true);
   const projectId = (await profile.json()).default_project_id as string;
@@ -48,7 +47,7 @@ async function appliedResources(page: Page, conversationId: string): Promise<App
 }
 
 test('registers imported SKILL.md as v1, searches name and description, and persists the exact applied revision', async ({ page, testServer }) => {
-  const { projectId, conversationId } = await createConversation(page, `b1-import-${randomUUID()}@example.test`, testServer.codeFor);
+  const { projectId, conversationId } = await createConversation(page, `b1-import-${randomUUID()}@example.test`);
   await openResources(page);
   await modal(page).locator('.resources-toolbar').getByRole('button', { name: '스킬 등록', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(1);
@@ -119,7 +118,7 @@ test('registers imported SKILL.md as v1, searches name and description, and pers
 });
 
 test('keeps an applied v1 when v2 exists and changes the conversation only after explicit apply', async ({ page, testServer }) => {
-  const { projectId, conversationId } = await createConversation(page, `b1-versions-${randomUUID()}@example.test`, testServer.codeFor);
+  const { projectId, conversationId } = await createConversation(page, `b1-versions-${randomUUID()}@example.test`);
   const name = `버전 고정 ${randomUUID().slice(0, 8)}`;
   const detail = await createSkill(page, projectId, name);
   const pin = await page.request.put(`/api/conversations/${conversationId}/resources`, {
@@ -172,7 +171,7 @@ test('keeps an applied v1 when v2 exists and changes the conversation only after
 });
 
 test('retains query and selection after apply failure and retries the same request key', async ({ page, testServer }) => {
-  const { projectId, conversationId } = await createConversation(page, `b1-retry-${randomUUID()}@example.test`, testServer.codeFor);
+  const { projectId, conversationId } = await createConversation(page, `b1-retry-${randomUUID()}@example.test`);
   const name = `재시도 기준 ${randomUUID().slice(0, 8)}`;
   const detail = await createSkill(page, projectId, name);
   await openResources(page);

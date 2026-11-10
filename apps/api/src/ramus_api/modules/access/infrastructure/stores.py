@@ -7,7 +7,12 @@ from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from ramus_api.modules.access.application.ports import NewEmailCode, NewSession
+from ramus_api.modules.access.application.ports import (
+    NewEmailCode,
+    NewSession,
+    PasswordAccount,
+    PasswordSetupSession,
+)
 from ramus_api.modules.access.domain.codes import EmailCodeState
 from ramus_api.modules.access.domain.models import (
     AccountProfile,
@@ -76,6 +81,26 @@ class SqlEmailCodeStore:
 
 
 class SqlAccountStore:
+    def password_configured(self, transaction: Session, account_id: UUID) -> bool | None:
+        return transaction.scalar(select(AccountRow.password_hash.is_not(None)).where(AccountRow.id == account_id))
+
+    def set_initial_password(self, transaction: Session, account_id: UUID, password_hash: str) -> bool:
+        account = transaction.scalar(update(AccountRow).where(
+            AccountRow.id == account_id, AccountRow.password_hash.is_(None),
+        ).values(password_hash=password_hash).returning(AccountRow.id))
+        return account is not None
+
+    def find_password_account(self, transaction: Session, email: str) -> PasswordAccount | None:
+        row = transaction.execute(select(AccountRow.id, AccountRow.password_hash).where(AccountRow.email == email)).one_or_none()
+        return None if row is None else PasswordAccount(row.id, row.password_hash)
+
+    def create_password_account(
+        self, transaction: Session, email: str, display_name: str, password_hash: str
+    ) -> UUID | None:
+        return transaction.scalar(insert(AccountRow).values(
+            id=new_id(), email=email, display_name=display_name, password_hash=password_hash,
+        ).on_conflict_do_nothing(index_elements=[AccountRow.email]).returning(AccountRow.id))
+
     def ensure_account(self, transaction: Session, email: str, display_name: str) -> UUID:
         transaction.execute(
             insert(AccountRow)
@@ -126,6 +151,12 @@ class SqlAccountStore:
 
 
 class SqlSessionStore:
+    def lock_for_account(self, transaction: Session, session_id: UUID, account_id: UUID) -> PasswordSetupSession | None:
+        row = transaction.scalar(select(SessionRow).where(
+            SessionRow.id == session_id, SessionRow.account_id == account_id,
+        ).with_for_update().execution_options(populate_existing=True))
+        return None if row is None else PasswordSetupSession(row.expires_at, row.revoked_at)
+
     def add(self, transaction: Session, session: NewSession) -> None:
         transaction.add(
             SessionRow(

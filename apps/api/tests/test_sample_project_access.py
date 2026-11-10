@@ -2,6 +2,7 @@
 
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from time import monotonic, sleep
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
@@ -121,7 +122,8 @@ def test_logins_join_only_prepared_destinations_and_keep_the_default_project(sam
     mailer = FakeMailer()
     settings = Settings(_env_file=None, database_url=sample_database.engine.url.render_as_string(hide_password=False))
     app = create_app(settings, mailer=mailer)
-    with TestClient(app) as existing, TestClient(app) as newcomer:
+    # One app owns one relay lifespan; each participant keeps a separate cookie jar.
+    with TestClient(app) as existing, closing(TestClient(app)) as newcomer:
         email = unique_email("before-seed")
         first = login(existing, mailer, email).json()
         assert first["default_project_id"] == str(SHARED_SAMPLE_PROJECT_ID)

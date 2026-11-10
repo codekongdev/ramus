@@ -1,7 +1,7 @@
 """Run the real API against a migrated disposable database for browser tests.
 
 Only the randomly named test database is created/dropped; existing workspace data is untouched.
-The development mailer's output is consumed privately by the Playwright fixture.
+Accounts register with passwords; the browser fixture needs no verification emails.
 """
 
 import asyncio
@@ -11,18 +11,44 @@ import secrets
 import subprocess
 import sys
 from base64 import urlsafe_b64encode
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from uuid import uuid4
 
 import uvicorn
 from pydantic import SecretStr
 from ramus_api.main import create_app
 from ramus_api.modules.access.application.errors import AI_KEY_INVALID, AccessRejected
-from ramus_api.modules.access.infrastructure.mailer import LoggingMailer
+from ramus_api.modules.access.domain.codes import hash_session_token
+from ramus_api.modules.access.domain.models import MembershipRole
+from ramus_api.modules.access.infrastructure.models import SessionRow
+from ramus_api.modules.access.infrastructure.stores import SqlAccountStore
 from ramus_api.modules.execution.domain.models import LlmRequest
 from ramus_api.modules.execution.fakes.llm import FakeLLM
+from ramus_api.modules.projects.public import ensure_shared_sample_project
 from ramus_api.settings import Settings
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
+from sqlalchemy.orm import Session
+
+
+def prepare_legacy_session(database_url: str) -> None:
+    """Seed a synthetic pre-migration login only in this disposable browser database."""
+    engine = create_engine(database_url)
+    try:
+        with Session(engine) as session, session.begin():
+            accounts = SqlAccountStore()
+            account_id = accounts.ensure_account(session, os.environ["RAMUS_E2E_LEGACY_EMAIL"], "기존 사용자")
+            project_id = ensure_shared_sample_project(session)
+            accounts.add_membership(session, account_id, project_id, MembershipRole.EDITOR)
+            now = datetime.now(UTC)
+            session.add(SessionRow(
+                id=uuid4(), account_id=account_id,
+                token_hash=hash_session_token(os.environ["RAMUS_E2E_LEGACY_SESSION"]),
+                expires_at=now + timedelta(days=14), created_at=now,
+            ))
+    finally:
+        engine.dispose()
 
 
 class TestAiKeyValidator:
@@ -85,6 +111,7 @@ def main() -> None:
                 env={**os.environ, "DATABASE_URL": database_url},
                 check=True,
             )
+            prepare_legacy_session(database_url)
             uvicorn.run(
                 create_app(
                     settings.model_copy(update={
@@ -93,7 +120,6 @@ def main() -> None:
                         "secret_key": SecretStr(urlsafe_b64encode(secrets.token_bytes(32)).decode()),
                     }),
                     ai_key_validator=TestAiKeyValidator(),
-                    mailer=LoggingMailer(),
                     llm_gateway=TestLlmGateway(),
                 ),
                 host="127.0.0.1",

@@ -16,7 +16,7 @@ ID = str(uuid4())
 
 # Implemented behavior is covered by the access/conversation/realtime integration suites.
 IMPLEMENTED = frozenset({
-    "requestEmailCode", "verifyEmailCode", "logout", "getMe", "getAiConnection", "connectAi", "disconnectAi",
+    "getPasswordStatus", "setInitialPassword", "registerAccount", "loginWithPassword", "requestEmailCode", "verifyEmailCode", "logout", "getMe", "getAiConnection", "connectAi", "disconnectAi",
     "listProjects", "createProject", "searchProjects", "listProjectParticipants", "getProjectGraph",
     "listConversations", "createConversation", "searchConversations", "getConversation",
     "listMessages", "postMessage", "streamProjectEvents",
@@ -29,6 +29,9 @@ IMPLEMENTED = frozenset({
 STUBS = tuple(e for e in CONTRACT_ENDPOINTS if e.operation_id not in IMPLEMENTED)
 
 BODIES: dict[str, dict] = {
+    "setInitialPassword": {"password": "synthetic-password"},
+    "registerAccount": {"email": "a@example.test", "password": "synthetic-password", "display_name": "A"},
+    "loginWithPassword": {"email": "a@example.test", "password": "synthetic-password"},
     "requestEmailCode": {"email": "a@example.com"},
     "verifyEmailCode": {"email": "a@example.com", "code": "123456"},
     "logout": {},

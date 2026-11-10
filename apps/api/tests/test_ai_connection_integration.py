@@ -3,6 +3,7 @@
 import logging
 import secrets
 from collections.abc import Iterator
+from contextlib import closing
 from uuid import UUID
 
 import pytest
@@ -124,7 +125,8 @@ def test_account_isolation_in_state_credentials_and_disconnect(client, app, mail
     owner = UUID(me['account']['id'])
     key = secrets.token_urlsafe(40)
     assert connect(client, key).status_code == 200
-    with TestClient(app) as other:
+    # The client fixture already owns this app's lifespan.
+    with closing(TestClient(app)) as other:
         other_me = login(other, mailer, unique_email('ai-other')).json()
         assert other.get(PATH).json() == {'status': 'none'}
         assert key not in other.get('/api/me').text

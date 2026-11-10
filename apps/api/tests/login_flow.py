@@ -45,11 +45,25 @@ def wrong_code(code: str) -> str:
     return f"{(int(code) + 1) % 1_000_000:06d}"
 
 
+TEST_PASSWORD = "synthetic-test-password-42"
+
+
 def login(client: TestClient, mailer: FakeMailer, email: str):
+    if client._transport.client[0] == "testclient":
+        client._transport.client = (f"password-fixture-{uuid4().hex}", 50000)
+    response = client.post("/api/auth/register", json={
+        "email": email, "password": TEST_PASSWORD, "display_name": email.strip().split("@")[0][:100],
+    }, headers=new_key("register"))
+    if response.status_code == 409:
+        response = client.post("/api/auth/login", json={"email": email, "password": TEST_PASSWORD}, headers=new_key("login"))
+    assert response.status_code == 200, response.text
+    return response
+
+
+def legacy_login(client: TestClient, mailer: FakeMailer, email: str):
     response = request_code(client, email)
     assert response.status_code == 202, response.text
-    normalized = email.strip().lower()
-    verified = verify(client, email, latest_code(mailer, normalized))
+    verified = verify(client, email, latest_code(mailer, email.strip().lower()))
     assert verified.status_code == 200, verified.text
     return verified
 

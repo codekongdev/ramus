@@ -36,10 +36,14 @@ class Endpoint:
 
 CONTRACT_ENDPOINTS: tuple[Endpoint, ...] = (
     # 3.1 track A
+    Endpoint("post", "/api/auth/register", "access", "registerAccount"),
+    Endpoint("post", "/api/auth/login", "access", "loginWithPassword"),
     Endpoint("post", "/api/auth/email-code", "access", "requestEmailCode", 202),
     Endpoint("post", "/api/auth/verify", "access", "verifyEmailCode"),
     Endpoint("post", "/api/auth/logout", "access", "logout"),
     Endpoint("get", "/api/me", "access", "getMe"),
+    Endpoint("get", "/api/me/password", "access", "getPasswordStatus"),
+    Endpoint("put", "/api/me/password", "access", "setInitialPassword"),
     Endpoint("get", "/api/me/ai-connection", "access", "getAiConnection"),
     Endpoint("put", "/api/me/ai-connection", "access", "connectAi"),
     Endpoint("delete", "/api/me/ai-connection", "access", "disconnectAi"),

@@ -48,7 +48,7 @@ def test_contract_table_has_no_duplicates() -> None:
 
 
 def test_contract_table_has_all_section_3_endpoints() -> None:
-    assert len(CONTRACT_ENDPOINTS) == 38
+    assert len(CONTRACT_ENDPOINTS) == 42
 
 
 @pytest.mark.parametrize("endpoint", CONTRACT_ENDPOINTS, ids=_ids(CONTRACT_ENDPOINTS))

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { test, expect, requestLoginCode, finishLogin } from './fixtures';
+import { test, expect, registerAccount } from './fixtures';
 
 test('real account API keeps connections private through replacement, refresh, disconnect and account switch', async ({ browser, testServer }) => {
   const contexts = await Promise.all([0, 1].map(() => browser.newContext({ baseURL: testServer.url })));
@@ -7,8 +7,7 @@ test('real account API keeps connections private through replacement, refresh, d
     const [first, second] = await Promise.all(contexts.map((context) => context.newPage()));
     for (const page of [first, second]) {
       const email = `ai-${randomUUID().slice(0, 8)}@example.test`;
-      await requestLoginCode(page, email);
-      await finishLogin(page, await testServer.codeFor(email));
+      await registerAccount(page, email);
     }
     expect((await first.request.get('/api/me')).ok()).toBe(true);
     expect(await (await second.request.get('/api/me/ai-connection')).json()).toEqual({ status: 'none' });
@@ -47,8 +46,7 @@ test('real account API keeps connections private through replacement, refresh, d
     await first.getByRole('button', { name: '로그아웃', exact: true }).click();
     await expect(first.getByLabel('이메일', { exact: true })).toBeVisible();
     const nextEmail = `ai-next-${randomUUID().slice(0, 8)}@example.test`;
-    await requestLoginCode(first, nextEmail);
-    await finishLogin(first, await testServer.codeFor(nextEmail));
+    await registerAccount(first, nextEmail);
     await open();
     await expect(dialog.getByLabel('OpenAI API 키', { exact: true })).toHaveValue('');
     expect(await (await first.request.get('/api/me/ai-connection')).json()).toEqual({ status: 'none' });

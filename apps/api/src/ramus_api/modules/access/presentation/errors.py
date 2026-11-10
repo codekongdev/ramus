@@ -4,12 +4,17 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 from ramus_api.modules.access.application.errors import (
+    ACCOUNT_ALREADY_EXISTS,
     AI_CONNECTION_REQUIRED,
     AI_KEY_INVALID,
     AUTH_CODE_EXPIRED,
     AUTH_CODE_INVALID,
+    AUTH_INVALID_CREDENTIALS,
+    AUTH_METHOD_DISABLED,
     AUTH_RATE_LIMITED,
+    PASSWORD_ALREADY_SET,
     SERVICE_UNAVAILABLE,
+    UNAUTHORIZED,
     AccessRejected,
 )
 from ramus_api.shared.domain import BusinessError
@@ -20,6 +25,11 @@ UNAUTHORIZED_STATUS = 401
 
 register_error_messages(
     {
+        PASSWORD_ALREADY_SET: "이미 비밀번호가 설정되어 있습니다.",
+        UNAUTHORIZED: "로그인이 필요합니다.",
+        AUTH_INVALID_CREDENTIALS: "이메일 또는 비밀번호가 올바르지 않습니다.",
+        ACCOUNT_ALREADY_EXISTS: "이미 가입된 이메일입니다. 로그인해 주세요.",
+        AUTH_METHOD_DISABLED: "이메일 인증 로그인을 사용할 수 없습니다.",
         AUTH_CODE_INVALID: "인증 코드가 올바르지 않습니다. 다시 확인해 주세요.",
         AUTH_CODE_EXPIRED: "인증 코드가 만료되었습니다. 코드를 다시 요청해 주세요.",
         AUTH_RATE_LIMITED: "인증 코드를 너무 자주 요청했습니다. 잠시 후 다시 시도해 주세요.",
@@ -30,6 +40,11 @@ register_error_messages(
 )
 
 _STATUSES: dict[str, int] = {
+    PASSWORD_ALREADY_SET: 409,
+    UNAUTHORIZED: 401,
+    AUTH_INVALID_CREDENTIALS: 401,
+    ACCOUNT_ALREADY_EXISTS: 409,
+    AUTH_METHOD_DISABLED: 410,
     AUTH_CODE_INVALID: 422,
     AUTH_CODE_EXPIRED: 422,
     AUTH_RATE_LIMITED: 429,

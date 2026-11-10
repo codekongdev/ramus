@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import type { components } from '../../apps/web/src/api/schema';
-import { test, expect, requestLoginCode, finishLogin } from './fixtures';
+import { test, expect, registerAccount } from './fixtures';
 
 type S = components['schemas'];
 const headers = () => ({ 'Idempotency-Key': randomUUID() });
@@ -28,8 +28,7 @@ test('applied resources flow through branching, pinned sharing, another AI reque
   await page.setViewportSize({ width: 1440, height: 1000 });
   const suffix = randomUUID().slice(0, 8);
   const email = `mvp-${suffix}@example.test`;
-  await requestLoginCode(page, email);
-  await finishLogin(page, await testServer.codeFor(email));
+  await registerAccount(page, email);
   const project = await post<S['Project']>(page, '/api/projects', { name: `MVP 연결 검증 ${suffix}` });
   const source = await post<S['Conversation']>(page, `/api/projects/${project.id}/conversations`, { title: '멤버십 공동 검토' });
   const resource = await post<S['ResourceDetail']>(page, `/api/projects/${project.id}/resources`, {

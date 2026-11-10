@@ -10,7 +10,7 @@ from ramus_api import main
 from ramus_api.container import AppContainer
 from ramus_api.modules import system
 from ramus_api.modules.access.fakes.services import FakeMailer
-from ramus_api.modules.access.infrastructure.mailer import LoggingMailer
+from ramus_api.modules.access.infrastructure.mailer import DisabledMailer, LoggingMailer
 from ramus_api.modules.execution.application.worker import RunWorker
 from ramus_api.modules.execution.infrastructure.summary_gateway import OpenAiGateway
 from ramus_api.modules.results.application.long_summary import LongSummaryGateway
@@ -74,9 +74,11 @@ def test_each_module_receives_the_shared_container(monkeypatch) -> None:
     assert container.idempotency is not None
 
 
-def test_container_uses_the_logging_mailer_unless_one_is_injected() -> None:
+def test_container_disables_mail_unless_legacy_auth_or_a_mailer_is_explicit() -> None:
     settings = Settings(_env_file=None, database_url=UNREACHABLE_DATABASE_URL)
-    assert isinstance(main.create_app(settings).state.container.mailer, LoggingMailer)
+    assert isinstance(main.create_app(settings).state.container.mailer, DisabledMailer)
+    legacy = settings.model_copy(update={"email_code_auth_enabled": True})
+    assert isinstance(main.create_app(legacy).state.container.mailer, LoggingMailer)
     fake = FakeMailer()
     assert main.create_app(settings, mailer=fake).state.container.mailer is fake
 

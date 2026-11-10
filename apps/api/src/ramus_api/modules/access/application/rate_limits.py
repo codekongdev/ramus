@@ -31,9 +31,9 @@ class AuthRateLimiter(Generic[T]):
     secret: str = field(repr=False)
 
     def check(self, scope: str, email: str, ip: str, *, key: str | None = None) -> None:
-        if scope == "request":
+        if scope in {"request", "register", "password_setup"}:
             subjects = [(f"email:{email}", REQUEST_EMAIL_LIMIT), (f"ip:{ip}", REQUEST_IP_LIMIT)]
-        elif scope == "verify":
+        elif scope in {"verify", "password_login"}:
             subjects = [(f"email:{email}", VERIFY_EMAIL_LIMIT), (f"ip:{ip}", VERIFY_IP_LIMIT)]
         else:
             subjects = [(f"receipt:{email}:{key}", SESSION_REISSUE_LIMIT)]

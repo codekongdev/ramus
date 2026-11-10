@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login With Password */
+        post: operations["loginWithPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/logout": {
         parameters: {
             query?: never;
@@ -32,6 +49,23 @@ export interface paths {
         put?: never;
         /** Logout */
         post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register Account */
+        post: operations["registerAccount"];
         delete?: never;
         options?: never;
         head?: never;
@@ -207,6 +241,24 @@ export interface paths {
         post?: never;
         /** Disconnect Ai */
         delete: operations["disconnectAi"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Password Status */
+        get: operations["getPasswordStatus"];
+        /** Set Initial Password */
+        put: operations["setInitialPassword"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1011,6 +1063,29 @@ export interface components {
             /** Next After Seq */
             next_after_seq: number | null;
         };
+        /** PasswordConfigured */
+        PasswordConfigured: {
+            /**
+             * Configured
+             * @constant
+             */
+            configured: true;
+        };
+        /** PasswordLoginRequest */
+        PasswordLoginRequest: {
+            /** Email */
+            email: string;
+            /**
+             * Password
+             * Format: password
+             */
+            password: string;
+        };
+        /** PasswordState */
+        PasswordState: {
+            /** Configured */
+            configured: boolean;
+        };
         /** PostMessageRequest */
         PostMessageRequest: {
             /** Body */
@@ -1078,6 +1153,18 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** RegisterAccountRequest */
+        RegisterAccountRequest: {
+            /** Display Name */
+            display_name: string;
+            /** Email */
+            email: string;
+            /**
+             * Password
+             * Format: password
+             */
+            password: string;
         };
         /** ReplaceAppliedResourcesRequest */
         ReplaceAppliedResourcesRequest: {
@@ -1394,6 +1481,14 @@ export interface components {
              */
             source_run_id: string;
         };
+        /** SetInitialPasswordRequest */
+        SetInitialPasswordRequest: {
+            /**
+             * Password
+             * Format: password
+             */
+            password: string;
+        };
         /** ShareOutcomeList */
         ShareOutcomeList: {
             /** Items */
@@ -1527,6 +1622,51 @@ export interface operations {
             };
         };
     };
+    loginWithPassword: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required. 1-128 characters of [A-Za-z0-9._:-]. Reusing a key with the same body replays the stored response. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     logout: {
         parameters: {
             query?: never;
@@ -1550,6 +1690,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EmptyResponse"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    registerAccount: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required. 1-128 characters of [A-Za-z0-9._:-]. Reusing a key with the same body replays the stored response. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
                 };
             };
             /** @description Client error */
@@ -2134,6 +2319,89 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiConnectionDisconnected"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getPasswordStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordState"];
+                };
+            };
+            /** @description Client error */
+            "4XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Server error */
+            "5XX": {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    setInitialPassword: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required. 1-128 characters of [A-Za-z0-9._:-]. Reusing a key with the same body replays the stored response. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetInitialPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordConfigured"];
                 };
             };
             /** @description Client error */

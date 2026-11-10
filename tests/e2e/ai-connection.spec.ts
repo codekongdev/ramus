@@ -4,6 +4,7 @@ const projectId = '00000000-0000-4000-8000-000000000001';
 
 test.beforeEach(async ({ page }) => {
   // Deterministic browser test: no real credential, mail, provider call or shared data writes.
+  await page.route('**/api/me/password', route => route.fulfill({ json: { configured: true } }));
   await page.route('**/api/me', (route) => route.fulfill({ json: {
     account: { id: '00000000-0000-4000-8000-000000000002', email: 'test@example.test', display_name: '테스트' },
     default_project_id: projectId, ai_connection: { status: 'none' },

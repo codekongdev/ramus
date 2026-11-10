@@ -1,4 +1,4 @@
-import { test, expect, requestLoginCode, finishLogin } from './fixtures';
+import { test, expect, registerAccount } from './fixtures';
 import type { Page } from '@playwright/test';
 import type { components } from '../../apps/web/src/api/schema';
 
@@ -32,8 +32,7 @@ test('real saved heads appear live, drafts stay out, and switching projects isol
   let interruptEvents = false;
   await page.route('**/api/projects/*/events', route => interruptEvents ? route.abort('internetdisconnected') : route.continue());
   const email = `b8-library-${crypto.randomUUID()}@example.test`;
-  await requestLoginCode(page, email);
-  await finishLogin(page, await testServer.codeFor(email));
+  await registerAccount(page, email);
   const project = await createProject(page, 'B8 결과물 검증');
   const connection = await page.request.put('/api/me/ai-connection', { data: { api_key: 'valid-test-b8-library' }, headers: headers() });
   expect(connection.ok()).toBe(true);
@@ -114,8 +113,7 @@ test('real saved heads appear live, drafts stay out, and switching projects isol
 
 test('retries server and schema errors, wraps long titles on a narrow screen, and restores keyboard focus', async ({ page, testServer }) => {
   const email = `b8-errors-${crypto.randomUUID()}@example.test`;
-  await requestLoginCode(page, email);
-  await finishLogin(page, await testServer.codeFor(email));
+  await registerAccount(page, email);
   const me: S['Me'] = await (await page.request.get('/api/me')).json();
   const longTitle = '검토한 멤버십 정책과 가입 혜택 및 반품 예외를 함께 정리한 결론 '.repeat(6).trim();
   const item: S['ProjectResultSummary'] = {

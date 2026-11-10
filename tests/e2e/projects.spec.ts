@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
-import { test, expect, requestLoginCode, finishLogin } from './fixtures';
+import { test, expect, registerAccount } from './fixtures';
 
 const conversation = (page: Page) => page.locator('[data-slot="conversation"]');
 const projectTrigger = (page: Page) => page.getByRole('button', { name: /^프로젝트 전환:/ });
@@ -29,8 +29,7 @@ test('new projects select their own workspace and remain isolated while switchin
     const [author, teammate] = pages;
     await Promise.all(pages.map(async (page, index) => {
       const email = `a8-${index}-${randomUUID().slice(0, 8)}@example.test`;
-      await requestLoginCode(page, email);
-      await finishLogin(page, await testServer.codeFor(email));
+      await registerAccount(page, email);
     }));
     const profiles = await Promise.all(pages.map(async page => {
       const response = await page.request.get('/api/me');
@@ -153,8 +152,7 @@ test('new projects select their own workspace and remain isolated while switchin
 
 test('retrying after a lost creation response preserves the name and reuses the committed project', async ({ page, testServer }) => {
   const email = `a8-retry-${randomUUID().slice(0, 8)}@example.test`;
-  await requestLoginCode(page, email);
-  await finishLogin(page, await testServer.codeFor(email));
+  await registerAccount(page, email);
   const name = `A8 응답 복구 ${randomUUID().slice(0, 8)}`;
   const keys: string[] = [];
   let committedProjectId: string | undefined;
