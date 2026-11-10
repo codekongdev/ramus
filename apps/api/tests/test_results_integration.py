@@ -3,6 +3,7 @@
 All database changes use the repository fixture's disposable test database, never development data.
 """
 
+import json
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from uuid import UUID, uuid4
@@ -262,6 +263,7 @@ async def test_receipt_replay_rechecks_project_membership(summary_fixture, datab
 @pytest.mark.asyncio
 async def test_long_summary_uses_bounded_calls_with_pinned_sources_and_requesters_connection(summary_fixture, database):
     fixture = summary_fixture
+    revision1, revision2 = pin_resource(database, fixture)
     created = fixture.summary().json()
     result_id = created["id"]
     await fixture.app.state.container.execution_runtime.worker.run_once()
@@ -271,6 +273,9 @@ async def test_long_summary_uses_bounded_calls_with_pinned_sources_and_requester
         last_seq = add_message(database, fixture, "새 조건을 검토합니다." * 1200)
 
     updated = fixture.summary(client=fixture.editor).json()
+    with database.transaction() as session:
+        pin = metadata.tables["conversation_resource"]
+        session.execute(update(pin).where(pin.c.conversation_id == fixture.conversation_id).values(revision_id=revision2))
     await fixture.app.state.container.execution_runtime.worker.run_once()
     result = fixture.result(result_id)
     assert result["draft"]["status"] == "ready"
@@ -282,6 +287,11 @@ async def test_long_summary_uses_bounded_calls_with_pinned_sources_and_requester
         assert request.credential_account_id == fixture.editor_id
         assert request.message_to_seq == last_seq
         assert UUID(approved["id"]) in {item.result_revision_id for item in request.context.results}
+        resources = json.loads(request.messages[-1].content)["resources"]
+        assert len(resources) == 1
+        assert resources[0]["revision_id"] == str(revision1)
+        assert resources[0]["instructions"] == "고정 지침 1"
+        assert "고정 지침 2" not in request.messages[-1].content
     saved = fixture.save(result_id, updated["draft"]["run_id"], version=1)
     assert saved.status_code == 200, saved.text
     assert saved.json()["version"] == 2
