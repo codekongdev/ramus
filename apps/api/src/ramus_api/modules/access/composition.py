@@ -12,6 +12,7 @@ from ramus_api.modules.access.application.rate_limits import AuthRateLimiter
 from ramus_api.modules.access.application.sessions import Authenticator, ProfileReader, SessionIssuer
 from ramus_api.modules.access.infrastructure.ai_connections import SqlAiConnectionStore
 from ramus_api.modules.access.infrastructure.credential_cipher import AesCredentialCipher
+from ramus_api.modules.access.infrastructure.email_deliveries import SqlEmailDeliveryStore
 from ramus_api.modules.access.infrastructure.rate_limits import SqlAttemptStore
 from ramus_api.modules.access.infrastructure.stores import SqlAccountStore, SqlEmailCodeStore, SqlSessionStore
 from ramus_api.modules.access.infrastructure.system import SystemClock, SystemSecretSource
@@ -56,7 +57,8 @@ def build_access_services(
     issuer = SessionIssuer(database.transaction, sessions, profiles, clock, secrets)
     return AccessServices(
         request_email_code=RequestEmailCode(
-            container.idempotency, codes, container.mailer, clock, secrets, limits, secret
+            container.idempotency, codes, container.mailer, clock, secrets, limits, secret,
+            database.transaction, SqlEmailDeliveryStore(),
         ),
         verify_email_code=VerifyEmailCode(
             container.idempotency, codes, accounts, shared_project, issuer, clock, limits, secret

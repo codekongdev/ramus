@@ -44,7 +44,7 @@
 | 인증 코드 | ASCII 숫자 6자리, 서버 비밀값 기반 HMAC으로 저장, 10분 후 만료, 코드당 5회까지 확인, 같은 이메일 재요청은 60초 간격. 이메일은 정규화 후 254자 이하이며 제어 문자를 허용하지 않는다 |
 | 인증 요청 상한 | 최근 1시간 기준 코드 요청은 이메일당 10회·접속 IP당 60회, 코드 확인은 이메일당 30회·접속 IP당 300회. 재전송으로 상한이 초기화되지 않는다. 프록시 전달 헤더 대신 서버가 확인한 접속 IP를 사용한다. 상한에 걸리면 429 `AUTH_RATE_LIMITED`, `details.resend_available_at`에 다음 허용 시각을 준다 |
 | 인증 재시도 | verify를 같은 키와 본문으로 재시도하면 코드 만료 전까지 새 세션을 발급하되 최초 요청을 포함해 3회로 제한한다. receipt에는 코드 원문 대신 서버 비밀값 기반 HMAC을 사용한 fingerprint를 남긴다. 로그아웃은 세션이 없어도 `{}`를 돌려준다 |
-| 메일 발송 | `Mailer` 포트. 개발 환경은 서버 로그에 코드를 출력하고, 시연 환경은 실제 발송 서비스를 쓴다(로드맵 D3) |
+| 메일 발송 | `Mailer` 포트. 개발 환경은 로그, 운영은 검증된 TLS SMTP. 발송 예약·시도 상태를 저장하고 메일 수락 뒤 코드 해시를 활성화한다. 실패는 503, 같은 키로 재요청하면 새 시도를 예약한다. 살아 있는 발송 lease는 503이며 시간당 상한은 유지한다 |
 | 세션 | 쿠키 `ramus_session`. `HttpOnly`, `SameSite=Lax`, `Path=/`, HTTPS 환경에서는 `Secure`. 14일 후 만료. DB에는 토큰 해시만 저장한다 |
 | 공동 샘플 | 로그인에 성공하면 고정 ID의 공동 샘플 프로젝트에 편집 참여자로 등록한다. 이미 참여 중이면 그대로 둔다 |
 | CSRF | 같은 출처 호출만 허용하고, 변경 요청에 JSON 본문과 사용자 정의 헤더(`Idempotency-Key`)를 요구해 다른 사이트의 폼 전송을 막는다 |
@@ -198,7 +198,8 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 | `project` | projects | `id`, `name`, `is_shared_sample`, `seed_key \| null` | `seed_key` 고유 |
 | `account` | access | `id`, `email`(소문자 정규화), `display_name` | `email` 고유 |
 | `membership` | access | `account_id`, `project_id`, `role`(`editor`) | PK(`account_id`, `project_id`) |
-| `email_code` | access | `id`, `email`, `code_hash`, `expires_at`, `attempts`, `consumed_at \| null` | (`email`, `created_at`) 인덱스 |
+| `email_code` | access | `id`, `email`, `code_hash`, `expires_at`, `attempts`, `consumed_at \| null` | (`email`, `created_at`) 인덱스. 성공적으로 발송 확정된 코드만 활성화 |
+| `email_code_delivery` | access | `id`, `email`, `status`, `attempt_id \| null`, `code_id \| null`, `code_hash \| null`, `code_created_at \| null`, `expires_at \| null`, `lease_until \| null`, `sent_at \| null` | `pending/sending/failed/sent`. 이메일별 sending 하나, 시도 토큰으로 늦은 완료 차단. 멱등 receipt는 delivery_id만 참조하며 코드 원문은 저장하지 않음 |
 | `session` | access | `id`, `account_id`, `token_hash`, `expires_at`, `revoked_at \| null` | `token_hash` 고유 |
 | `ai_connection` | access | `account_id`, `provider`(`openai`), `ciphertext`, `status`, `verified_at` | PK(`account_id`). 키 원문·끝자리는 저장하지 않는다 |
 | `conversation` | conversations | `id`, `project_id`, `parent_id \| null`, `task_id \| null`, `title`, `origin`(`top` \| `branch` \| `from_result`), `created_by`, `seed_key \| null` | (`project_id`, `title`) 인덱스 |

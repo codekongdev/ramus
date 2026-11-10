@@ -11,10 +11,12 @@ from functools import partial
 from typing import Any, Generic, TypeVar
 from uuid import UUID
 
+from ramus_api.modules.access.application.email_delivery import DELIVERY_LEASE, EmailDeliveryStore
 from ramus_api.modules.access.application.errors import (
     AUTH_CODE_EXPIRED,
     AUTH_CODE_INVALID,
     AUTH_RATE_LIMITED,
+    SERVICE_UNAVAILABLE,
     AccessRejected,
 )
 from ramus_api.modules.access.application.ports import (
@@ -25,6 +27,7 @@ from ramus_api.modules.access.application.ports import (
     NewEmailCode,
     SecretSource,
     SharedProjectProvider,
+    TransactionFactory,
 )
 from ramus_api.modules.access.application.rate_limits import AuthRateLimiter
 from ramus_api.modules.access.application.sessions import IssuedSession, SessionIssuer
@@ -68,36 +71,78 @@ class RequestEmailCode(Generic[T]):
     secrets: SecretSource
     limits: AuthRateLimiter[T]
     secret: str = field(repr=False)
+    transactions: TransactionFactory[T]
+    deliveries: EmailDeliveryStore[T]
 
     async def __call__(self, email: str, key: str, ip: str = "unknown") -> datetime:
-        """Stores a new code and mails it. Returns when the next code may be requested.
+        """Reserve, send outside the transaction, then activate a successfully delivered code.
 
-        Raises ``AccessRejected`` (``AUTH_RATE_LIMITED``) within the resend interval. Mail goes out
-        only after the receipt and code row commit, because the executor forbids external calls
-        inside the operation. A mailer failure propagates (500); the stored code stays unused.
+        A receipt points to durable delivery state, so replay cannot silently turn a failed or
+        interrupted send into success. Codes remain only in memory until their hash is activated.
         """
         await asyncio.to_thread(self.limits.check, "request", email, ip)
-        code = self.secrets.new_code()
-        operation = partial(self._store_code, email, code)
         payload = {"email": email}
         result = await asyncio.to_thread(
-            self.idempotency.execute_with_status, ANONYMOUS_ACTOR, EMAIL_CODE_SCOPE, key, payload, operation
+            self.idempotency.execute_once, ANONYMOUS_ACTOR, EMAIL_CODE_SCOPE, key, payload,
+            partial(self._prepare_delivery, email),
         )
-        if not result.replayed:
+        # Receipts created before delivery tracking contained only this successful response.
+        if "delivery_id" not in result:
+            return _stored_datetime(result, "resend_available_at")
+        delivery_id = UUID(result["delivery_id"])
+        code = self.secrets.new_code()
+        claim = await asyncio.to_thread(self._claim_delivery, email, delivery_id, code)
+        if claim.attempt_id is None:
+            assert claim.resend_available_at is not None
+            return claim.resend_available_at
+        failed = False
+        try:
             await self.mailer.send_code(email, code)
-        return _stored_datetime(result.response, "resend_available_at")
+        except asyncio.CancelledError:
+            # SMTP may still be running in a thread. Keep its lease until it can be reclaimed.
+            raise
+        except Exception:
+            failed = True
+        if failed:
+            try:
+                await asyncio.to_thread(self._fail_delivery, email, delivery_id, claim.attempt_id)
+            except Exception:
+                # A storage outage leaves the durable lease reclaimable. Never chain a mail
+                # provider's exception (which may contain a code) into a server traceback.
+                raise AccessRejected(SERVICE_UNAVAILABLE) from None
+            raise AccessRejected(SERVICE_UNAVAILABLE) from None
+        completed = await asyncio.to_thread(self._complete_delivery, email, delivery_id, claim.attempt_id)
+        if completed is None:
+            raise AccessRejected(SERVICE_UNAVAILABLE)
+        return completed
 
-    def _store_code(self, email: str, code: str, transaction: T) -> JsonObject:
+    def _prepare_delivery(self, email: str, transaction: T) -> JsonObject:
         self.codes.lock_email(transaction, email)
         now = self.clock.now()
         last_created_at = self.codes.latest_created_at(transaction, email)
         if last_created_at is not None and not can_resend(last_created_at, now):
             available_at = to_iso_utc(resend_available_at(last_created_at))
             raise AccessRejected(AUTH_RATE_LIMITED, {"resend_available_at": available_at})
-        code_id = new_id()
-        digest = hash_code(code, str(code_id), self.secret)
-        self.codes.add(transaction, NewEmailCode(code_id, email, digest, now, code_expires_at(now)))
-        return {"resend_available_at": to_iso_utc(resend_available_at(now))}
+        delivery_id = new_id()
+        self.deliveries.prepare(transaction, delivery_id, email, now)
+        return {"delivery_id": str(delivery_id)}
+
+    def _claim_delivery(self, email: str, delivery_id: UUID, code: str):
+        with self.transactions() as transaction:
+            self.codes.lock_email(transaction, email)
+            now, code_id, attempt_id = self.clock.now(), new_id(), new_id()
+            value = NewEmailCode(code_id, email, hash_code(code, str(code_id), self.secret), now, code_expires_at(now))
+            return self.deliveries.claim(transaction, delivery_id, email, value, attempt_id, now, now + DELIVERY_LEASE)
+
+    def _fail_delivery(self, email: str, delivery_id: UUID, attempt_id: UUID) -> None:
+        with self.transactions() as transaction:
+            self.codes.lock_email(transaction, email)
+            self.deliveries.fail(transaction, delivery_id, attempt_id)
+
+    def _complete_delivery(self, email: str, delivery_id: UUID, attempt_id: UUID) -> datetime | None:
+        with self.transactions() as transaction:
+            self.codes.lock_email(transaction, email)
+            return self.deliveries.complete(transaction, delivery_id, attempt_id, self.clock.now())
 
 
 @dataclass(frozen=True)

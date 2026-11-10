@@ -17,6 +17,7 @@ import uvicorn
 from pydantic import SecretStr
 from ramus_api.main import create_app
 from ramus_api.modules.access.application.errors import AI_KEY_INVALID, AccessRejected
+from ramus_api.modules.access.infrastructure.mailer import LoggingMailer
 from ramus_api.modules.execution.domain.models import LlmRequest
 from ramus_api.modules.execution.fakes.llm import FakeLLM
 from ramus_api.settings import Settings
@@ -88,9 +89,11 @@ def main() -> None:
                 create_app(
                     settings.model_copy(update={
                         "database_url": database_url,
+                        "environment": "test",
                         "secret_key": SecretStr(urlsafe_b64encode(secrets.token_bytes(32)).decode()),
                     }),
                     ai_key_validator=TestAiKeyValidator(),
+                    mailer=LoggingMailer(),
                     llm_gateway=TestLlmGateway(),
                 ),
                 host="127.0.0.1",

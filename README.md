@@ -121,6 +121,23 @@ No email is sent in development. Sign-in verification codes appear in the API se
 When serving over HTTPS, set `RAMUS_COOKIE_SECURE=true` to add the `Secure` attribute to session cookies.
 In deployed environments, set `RAMUS_AUTH_SECRET` to a stable secret of at least 32 characters. It is used for the HMAC of verification codes and sign-in receipts. If left empty, a new temporary value is generated each time the development server restarts, invalidating outstanding codes and retry receipts.
 
+## Production mail delivery
+
+Set `RAMUS_ENV=staging` or `production`, `RAMUS_MAILER=smtp`, a stable `RAMUS_AUTH_SECRET`,
+`RAMUS_SMTP_HOST`, and `RAMUS_SMTP_FROM` to use your provider's verified sender. Configure
+`RAMUS_SMTP_USERNAME` and `RAMUS_SMTP_PASSWORD` together when the provider requires authentication.
+`RAMUS_SMTP_SECURITY=starttls` with port `587` is the default; use `tls` with the provider's implicit-TLS
+port (commonly `465`) when required. `RAMUS_SMTP_TIMEOUT` defaults to 10 seconds per socket operation
+and accepts values up to 30. Certificates are verified; plaintext delivery is unavailable.
+Staging and production refuse the development logging mailer and incomplete SMTP settings at startup.
+
+Failed delivery returns 503 and keeps the existing confirmed code usable. Retry the same request key
+to send again immediately; the 60-second cooldown starts after successful delivery. Hourly request
+limits still apply. Interrupted sends keep a two-minute reservation before another attempt may claim
+them. SMTP acceptance and database confirmation cannot be atomic, so an interrupted send can result
+in another email; stale attempts cannot activate their code over a newer attempt.
+See [mail delivery and retry verification](docs/mail-delivery.md) for the state flow and remaining operational checks.
+
 Tests (`uv run --project apps/api pytest`) do not use the development database specified by `DATABASE_URL`.
 Each run creates and migrates a temporary `ramus_test_<random>` database on the same server, then removes it when finished.
 Integration tests fail if PostgreSQL is not running. Add `-m "not integration"` to run unit tests only.

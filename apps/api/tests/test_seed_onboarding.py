@@ -31,7 +31,12 @@ def test_concurrent_first_logins_and_refresh_preserve_one_prepared_sample(fresh_
         tree_url = f"/api/projects/{SHARED_SAMPLE_PROJECT_ID}/conversations"
         message_url = f"/api/conversations/{design_id}/messages"
         with ExitStack() as stack:
-            clients = [stack.enter_context(TestClient(app)) for _ in range(3)]
+            # One server lifespan owns the relay; each participant keeps a separate cookie jar.
+            clients = [stack.enter_context(TestClient(app))]
+            for _ in range(2):
+                client = TestClient(app)
+                stack.callback(client.close)
+                clients.append(client)
             emails = [unique_email(f"seed-{index}") for index in range(3)]
             with ThreadPoolExecutor(max_workers=3) as pool:
                 sessions = list(pool.map(lambda pair: login(pair[0], mailer, pair[1]).json(), zip(clients, emails, strict=True)))

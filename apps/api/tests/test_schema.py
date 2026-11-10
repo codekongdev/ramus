@@ -26,7 +26,7 @@ def test_migrated_columns_match_contract_and_all_tables_have_created_at(database
         table = re.search(r"`([a-z_]+)`", cells[0]).group(1)
         columns = re.findall(r"(?:^|,)\s*`([a-z_]+)(?: \\?\| null)?`", cells[2])
         expected[table] = set(columns) | {"created_at"}
-    assert len(expected) == 19
+    assert len(expected) == 20
     engine = create_engine(database_url)
     try:
         inspector = inspect(engine)

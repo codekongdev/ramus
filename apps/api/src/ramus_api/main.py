@@ -17,10 +17,10 @@ from sqlalchemy.orm import Session
 from ramus_api.container import AppContainer, ModuleRegistrar
 from ramus_api.modules.access.application.ports import AiKeyValidator, Mailer
 from ramus_api.modules.access.composition import build_ai_connections, build_authenticator
-from ramus_api.modules.access.infrastructure.mailer import LoggingMailer
 from ramus_api.modules.access.infrastructure.openai_key_validator import OpenAiKeyValidator
 from ramus_api.modules.access.infrastructure.project_access import SqlAiConnectionQuery, SqlProjectAccess
 from ramus_api.modules.access.infrastructure.stores import SqlAccountStore
+from ramus_api.modules.access.mailer_composition import build_mailer
 from ramus_api.modules.access.presentation.routes import register as register_access
 from ramus_api.modules.access.public import MembershipReader, MembershipWriter
 from ramus_api.modules.conversations.composition import CommittedEvents
@@ -107,7 +107,7 @@ def build_container(
     *,
     llm_gateway: LlmGateway | None = None,
 ) -> AppContainer:
-    """``mailer`` defaults to the development ``LoggingMailer``, which prints codes to the server log."""
+    """Choose the configured mailer and keep the development logger out of deployed environments."""
     database = Database(settings.database_url)
     events = InProcessEventBroker()
     relay, hooks = EventRelay(events), SqlAlchemyTransactionHooks()
@@ -118,7 +118,7 @@ def build_container(
         settings=settings,
         database=database,
         idempotency=SqlIdempotentExecutor(database),
-        mailer=mailer if mailer is not None else LoggingMailer(),
+        mailer=build_mailer(settings, mailer),
         authenticator=build_authenticator(database),
         project_access=SqlProjectAccess(),
         events=events,
