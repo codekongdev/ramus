@@ -241,8 +241,8 @@ def test_failing_mailer_is_a_server_error_without_leaking_the_code(
     with TestClient(create_app(integration_settings, mailer=broken), raise_server_exceptions=False) as client:
         with caplog.at_level(logging.DEBUG):
             response = request_code(client, unique_email("broken"))
-    assert response.status_code == 500
-    assert error_code(response) == "INTERNAL_ERROR"
+    assert response.status_code == 503
+    assert error_code(response) == "SERVICE_UNAVAILABLE"
     [code] = broken.codes
     assert code not in response.text
     assert code not in caplog.text

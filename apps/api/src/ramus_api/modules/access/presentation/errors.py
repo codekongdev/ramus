@@ -25,7 +25,7 @@ register_error_messages(
         AUTH_RATE_LIMITED: "인증 코드를 너무 자주 요청했습니다. 잠시 후 다시 시도해 주세요.",
         AI_KEY_INVALID: "API 키가 올바르지 않거나 AI를 호출할 수 없습니다. 키와 사용 한도를 확인해 주세요.",
         AI_CONNECTION_REQUIRED: "AI 연결을 먼저 설정해 주세요.",
-        SERVICE_UNAVAILABLE: "AI 연결을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+        SERVICE_UNAVAILABLE: "요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요.",
     }
 )
 
