@@ -1,4 +1,4 @@
-import { test, expect, requestLoginCode, finishLogin } from './fixtures';
+import { test, expect, registerAccount } from './fixtures';
 import type { Page } from '@playwright/test';
 import type { components } from '../../apps/web/src/api/schema';
 import { task as initialTask, conversation, parent, message, me, createdAt } from '../../apps/web/tests/fixtures/tasks';
@@ -51,6 +51,7 @@ async function mockResults(page: Page, connected = true) {
     const json = (value: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) });
     if (request.method() === 'GET') {
       if (path === '/api/me') return json({ ...me, ai_connection: { status: connected ? 'connected' : 'none' } });
+      if (path === '/api/me/password') return json({ configured: true });
       if (path === '/api/me/ai-connection') return json({ status: connected ? 'connected' : 'none' });
       if (path === '/api/projects') return json({ items: [{ id: 'p1', name: '공동 샘플', is_shared_sample: true }] });
       if (path === '/api/projects/p1/participants') return json({ items: [me.account] });
@@ -226,8 +227,7 @@ test('a cancelled AI connection does not start a summary; connection resumes exa
 
 test('real server stores summary revisions and reopens the approved result', async ({ page, testServer }) => {
   const email = `b4-${Date.now()}@example.test`;
-  await requestLoginCode(page, email);
-  await finishLogin(page, await testServer.codeFor(email));
+  await registerAccount(page, email);
   const identity = await (await page.request.get('/api/me')).json();
   const key = () => ({ 'Idempotency-Key': crypto.randomUUID() });
   const connection = await page.request.put('/api/me/ai-connection', { data: { api_key: 'valid-test-b4-server' }, headers: key() });

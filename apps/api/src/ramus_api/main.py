@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from ramus_api.container import AppContainer, ModuleRegistrar
 from ramus_api.modules.access.application.ports import AiKeyValidator, Mailer
 from ramus_api.modules.access.composition import build_ai_connections, build_authenticator
+from ramus_api.modules.access.infrastructure.mailer import DisabledMailer
 from ramus_api.modules.access.infrastructure.openai_key_validator import OpenAiKeyValidator
 from ramus_api.modules.access.infrastructure.project_access import SqlAiConnectionQuery, SqlProjectAccess
 from ramus_api.modules.access.infrastructure.stores import SqlAccountStore
@@ -108,6 +109,8 @@ def build_container(
     llm_gateway: LlmGateway | None = None,
 ) -> AppContainer:
     """Choose the configured mailer and keep the development logger out of deployed environments."""
+    if settings.environment in {"staging", "production"} and settings.uses_ephemeral_auth_secret:
+        raise ValueError("Deployed authentication requires a stable RAMUS_AUTH_SECRET.")
     database = Database(settings.database_url)
     events = InProcessEventBroker()
     relay, hooks = EventRelay(events), SqlAlchemyTransactionHooks()
@@ -118,7 +121,7 @@ def build_container(
         settings=settings,
         database=database,
         idempotency=SqlIdempotentExecutor(database),
-        mailer=build_mailer(settings, mailer),
+        mailer=build_mailer(settings, mailer) if settings.email_code_auth_enabled or mailer is not None else DisabledMailer(),
         authenticator=build_authenticator(database),
         project_access=SqlProjectAccess(),
         events=events,

@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "staging", "production"] = Field(
         default="development", validation_alias="RAMUS_ENV"
     )
+    email_code_auth_enabled: bool = Field(default=False, validation_alias="RAMUS_EMAIL_CODE_AUTH_ENABLED")
     mailer_backend: Literal["logging", "smtp"] = Field(default="logging", validation_alias="RAMUS_MAILER")
     smtp_host: str | None = Field(default=None, min_length=1, validation_alias="RAMUS_SMTP_HOST")
     smtp_port: int = Field(default=587, ge=MIN_PORT, le=MAX_PORT, validation_alias="RAMUS_SMTP_PORT")

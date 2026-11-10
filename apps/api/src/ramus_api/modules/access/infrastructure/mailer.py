@@ -37,3 +37,12 @@ class LoggingMailer:
         self._logger.info(
             "[DEV MAIL - not sent] Ramus login code for %s: %s (valid for %d minutes)", email, code, minutes
         )
+
+
+class DisabledMailer:
+    """Password authentication needs no external mail provider."""
+
+    async def send_code(self, email: str, code: str) -> None:
+        from ramus_api.modules.access.application.errors import AUTH_METHOD_DISABLED, AccessRejected
+
+        raise AccessRejected(AUTH_METHOD_DISABLED)

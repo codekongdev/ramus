@@ -1,5 +1,5 @@
 import type { components } from '../../apps/web/src/api/schema';
-import { test, expect, requestLoginCode, finishLogin } from './fixtures';
+import { test, expect, registerAccount } from './fixtures';
 
 type S = components['schemas'];
 const headers = () => ({ 'Idempotency-Key': crypto.randomUUID() });
@@ -7,8 +7,7 @@ test.use({ viewport: { width: 1440, height: 1000 } });
 
 test('shows real branch and conclusion usage, opens the task, and preserves the conversation draft', async ({ page, testServer }) => {
   const email = `a9-${crypto.randomUUID()}@example.test`;
-  await requestLoginCode(page, email);
-  await finishLogin(page, await testServer.codeFor(email));
+  await registerAccount(page, email);
   const project = await (await page.request.post('/api/projects', { data: { name: 'A9 관계 지도' }, headers: headers() })).json() as S['Project'];
   const create = async (title: string): Promise<S['Conversation']> => {
     const response = await page.request.post(`/api/projects/${project.id}/conversations`, { data: { title }, headers: headers() });
@@ -63,7 +62,7 @@ test('shows real branch and conclusion usage, opens the task, and preserves the 
 
 test('retries malformed data and keeps long nodes separated', async ({ page, testServer }) => {
   const email = `a9-errors-${crypto.randomUUID()}@example.test`;
-  await requestLoginCode(page, email); await finishLogin(page, await testServer.codeFor(email));
+  await registerAccount(page, email);
   const me = await (await page.request.get('/api/me')).json() as S['Me'];
   const title = '긴 프로젝트 관계 제목 '.repeat(12).trim(); let attempt = 0;
   await page.route(`**/api/projects/${me.default_project_id}/graph`, route => {

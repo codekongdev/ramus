@@ -1,16 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import type { components } from '../../apps/web/src/api/schema';
-import { test, expect, requestLoginCode, finishLogin } from './fixtures';
+import { test, expect, registerAccount } from './fixtures';
 
 type Detail = components['schemas']['ResourceDetail'];
 const modal = (page: Page) => page.getByRole('dialog', { name: '스킬·자료', exact: true });
 const detailView = (page: Page) => modal(page).locator('[data-step="detail"]');
 
-async function signIn(page: Page, codeFor: (email: string) => Promise<string>) {
+async function signIn(page: Page) {
   const email = `b2-${randomUUID()}@example.test`;
-  await requestLoginCode(page, email);
-  await finishLogin(page, await codeFor(email));
+  await registerAccount(page, email);
   const profile = await page.request.get('/api/me');
   expect(profile.ok()).toBe(true);
   return profile.json();
@@ -65,7 +64,7 @@ test('saving a new version preserves another conversation pin until explicit lat
   const contexts = await Promise.all([0, 1].map(() => browser.newContext({ baseURL: testServer.url, viewport: { width: 1440, height: 1000 } })));
   try {
     const [author, editor] = await Promise.all(contexts.map(context => context.newPage()));
-    const [one, two] = await Promise.all([signIn(author, testServer.codeFor), signIn(editor, testServer.codeFor)]);
+    const [one, two] = await Promise.all([signIn(author), signIn(editor)]);
     expect(one.default_project_id).toBe(two.default_project_id);
     const { resource, conversationId } = await createFixture(author, one.default_project_id);
     await openDetail(editor, resource.revision.name);
@@ -120,7 +119,7 @@ test('saving a new version preserves another conversation pin until explicit lat
 });
 
 test('a conflicting save preserves its draft while latest content is inspected', async ({ page, testServer }) => {
-  const profile = await signIn(page, testServer.codeFor);
+  const profile = await signIn(page);
   const { resource, conversationId } = await createFixture(page, profile.default_project_id);
   await openDetail(page, resource.revision.name);
   await modal(page).getByRole('button', { name: '수정', exact: true }).click();
@@ -142,7 +141,7 @@ test('a conflicting save preserves its draft while latest content is inspected',
 });
 
 test('retrying a lost save response reuses its key and never creates a duplicate revision', async ({ page, testServer }) => {
-  const profile = await signIn(page, testServer.codeFor);
+  const profile = await signIn(page);
   const { resource, conversationId } = await createFixture(page, profile.default_project_id);
   await openDetail(page, resource.revision.name);
   await modal(page).getByRole('button', { name: '수정', exact: true }).click();
@@ -183,7 +182,7 @@ test('retrying a lost save response reuses its key and never creates a duplicate
 });
 
 test('a failed file replacement blocks saving and a valid replacement preserves the old version', async ({ page, testServer }) => {
-  const profile = await signIn(page, testServer.codeFor);
+  const profile = await signIn(page);
   const { resource, conversationId } = await createFixture(page, profile.default_project_id, 'file');
   await openDetail(page, resource.revision.name);
   await modal(page).getByRole('button', { name: '수정', exact: true }).click();

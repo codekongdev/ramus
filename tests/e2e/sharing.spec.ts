@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import type { components } from '../../apps/web/src/api/schema';
-import { test, expect, requestLoginCode, finishLogin } from './fixtures';
+import { test, expect, registerAccount } from './fixtures';
 
 type S = components['schemas'];
 const headers = () => ({ 'Idempotency-Key': randomUUID() });
@@ -17,8 +17,7 @@ async function inputs(page: Page, conversationId: string): Promise<S['Conversati
 
 test('sends a pinned conclusion to multiple conversations, forwards it, and explicitly replaces its version', async ({ page, context, testServer }) => {
   const email = `b6-${randomUUID()}@example.test`;
-  await requestLoginCode(page, email);
-  await finishLogin(page, await testServer.codeFor(email));
+  await registerAccount(page, email);
   const identity = await (await page.request.get('/api/me')).json() as S['Me'];
   const projectId = identity.default_project_id;
   const create = async (title: string): Promise<S['Conversation']> => {

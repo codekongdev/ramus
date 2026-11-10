@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, FastAPI, Request, Response
 from sqlalchemy.orm import Session
 
 from ramus_api.container import AppContainer
+from ramus_api.modules.access.application.errors import AUTH_METHOD_DISABLED, AccessRejected
 from ramus_api.modules.access.application.ports import SharedProjectProvider
 from ramus_api.modules.access.composition import AccessServices, build_access_services
 from ramus_api.modules.access.domain.models import MeProfile
@@ -22,8 +23,13 @@ from ramus_api.modules.access.presentation.dto import (
     AiConnectionState,
     ConnectAiRequest,
     Me,
+    PasswordConfigured,
+    PasswordLoginRequest,
+    PasswordState,
+    RegisterAccountRequest,
     RequestEmailCodeRequest,
     RequestEmailCodeResponse,
+    SetInitialPasswordRequest,
     VerifyEmailCodeRequest,
 )
 from ramus_api.modules.access.presentation.errors import access_errors, unauthorized
@@ -46,12 +52,37 @@ def register(
     services = build_access_services(container, shared_project)
     router = APIRouter(prefix="/api", tags=["access"])
     _add_login_routes(router, container, services)
+    _add_password_setup_routes(router, container, services)
     _add_ai_connection_routes(router, container, services)
     app.include_router(router)
 
 
 def _add_login_routes(router: APIRouter, container: AppContainer, services: AccessServices) -> None:
     secure = container.settings.cookie_secure
+
+    @router.post("/auth/register", response_model=Me, operation_id="registerAccount")
+    def register_account(
+        body: RegisterAccountRequest, idempotency_key: IdempotencyKey, response: Response, request: Request
+    ):
+        with access_errors():
+            issued = services.passwords.register(
+                body.email, body.password.get_secret_value(), body.display_name, idempotency_key,
+                request.client.host if request.client else "unknown",
+            )
+        set_session_cookie(response, issued.token, expires_at=issued.expires_at, secure=secure)
+        return to_me(issued.me)
+
+    @router.post("/auth/login", response_model=Me, operation_id="loginWithPassword")
+    def login_with_password(
+        body: PasswordLoginRequest, idempotency_key: IdempotencyKey, response: Response, request: Request
+    ):
+        with access_errors():
+            issued = services.passwords.login(
+                body.email, body.password.get_secret_value(), idempotency_key,
+                request.client.host if request.client else "unknown",
+            )
+        set_session_cookie(response, issued.token, expires_at=issued.expires_at, secure=secure)
+        return to_me(issued.me)
 
     @router.post(
         "/auth/email-code",
@@ -64,6 +95,8 @@ def _add_login_routes(router: APIRouter, container: AppContainer, services: Acce
     ):
         # The same response whether or not an account exists for the address.
         with access_errors():
+            if not container.settings.email_code_auth_enabled:
+                raise AccessRejected(AUTH_METHOD_DISABLED)
             available_at = await services.request_email_code(
                 body.email, idempotency_key, request.client.host if request.client else "unknown"
             )
@@ -74,6 +107,8 @@ def _add_login_routes(router: APIRouter, container: AppContainer, services: Acce
         body: VerifyEmailCodeRequest, idempotency_key: IdempotencyKey, response: Response, request: Request
     ):
         with access_errors():
+            if not container.settings.email_code_auth_enabled:
+                raise AccessRejected(AUTH_METHOD_DISABLED)
             issued = services.verify_email_code(
                 body.email, body.code, idempotency_key, request.client.host if request.client else "unknown"
             )
@@ -114,3 +149,22 @@ def _add_ai_connection_routes(router: APIRouter, container: AppContainer, servic
     def disconnect_ai(idempotency_key: IdempotencyKey, account: CurrentAccount):
         services.ai_connections.disconnect(account.account_id, idempotency_key)
         return AiConnectionDisconnected(status="none")
+
+
+def _add_password_setup_routes(router: APIRouter, container: AppContainer, services: AccessServices) -> None:
+    CurrentAccount = Annotated[AuthenticatedAccount, Depends(require_account(container))]
+
+    @router.get("/me/password", response_model=PasswordState, operation_id="getPasswordStatus")
+    def get_password_status(account: CurrentAccount):
+        with access_errors():
+            return PasswordState(configured=services.password_setup.status(account))
+
+    @router.put("/me/password", response_model=PasswordConfigured, operation_id="setInitialPassword")
+    def set_initial_password(
+        body: SetInitialPasswordRequest, idempotency_key: IdempotencyKey, account: CurrentAccount, request: Request,
+    ):
+        with access_errors():
+            return services.password_setup.set_password(
+                account, body.password.get_secret_value(), idempotency_key,
+                request.client.host if request.client else "unknown",
+            )

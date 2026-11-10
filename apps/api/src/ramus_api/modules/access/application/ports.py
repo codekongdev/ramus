@@ -4,7 +4,7 @@ Store methods run inside the caller's transaction (``TransactionT``); the use ca
 """
 
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol, TypeVar
 from uuid import UUID
@@ -153,3 +153,41 @@ class SharedProjectProvider(Protocol[TransactionT]):
     def existing_followup_project_ids(self, transaction: TransactionT) -> tuple[UUID, ...]:
         """Prepared optional sample destinations; this lookup must not create any project."""
         ...
+
+
+@dataclass(frozen=True)
+class PasswordAccount:
+    account_id: UUID
+    password_hash: str | None = field(repr=False)
+
+
+class PasswordHasher(Protocol):
+    def hash(self, password: str) -> str: ...
+
+    def verify(self, password: str, encoded: str | None) -> bool: ...
+
+
+class PasswordAccountStore(Protocol[TransactionT]):
+    def find_password_account(self, transaction: TransactionT, email: str) -> PasswordAccount | None: ...
+
+    def create_password_account(
+        self, transaction: TransactionT, email: str, display_name: str, password_hash: str
+    ) -> UUID | None: ...
+
+
+@dataclass(frozen=True)
+class PasswordSetupSession:
+    expires_at: datetime
+    revoked_at: datetime | None
+
+
+class PasswordSetupSessions(Protocol[TransactionT]):
+    def lock_for_account(
+        self, transaction: TransactionT, session_id: UUID, account_id: UUID
+    ) -> PasswordSetupSession | None: ...
+
+
+class PasswordSetupAccounts(Protocol[TransactionT]):
+    def password_configured(self, transaction: TransactionT, account_id: UUID) -> bool | None: ...
+
+    def set_initial_password(self, transaction: TransactionT, account_id: UUID, password_hash: str) -> bool: ...

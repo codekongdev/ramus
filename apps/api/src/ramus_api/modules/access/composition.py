@@ -7,12 +7,15 @@ from sqlalchemy.orm import Session
 from ramus_api.container import AppContainer
 from ramus_api.modules.access.application.ai_connection import AiConnections
 from ramus_api.modules.access.application.login import RequestEmailCode, VerifyEmailCode
+from ramus_api.modules.access.application.password_login import PasswordAuthentication
+from ramus_api.modules.access.application.password_setup import PasswordSetup
 from ramus_api.modules.access.application.ports import SharedProjectProvider
 from ramus_api.modules.access.application.rate_limits import AuthRateLimiter
 from ramus_api.modules.access.application.sessions import Authenticator, ProfileReader, SessionIssuer
 from ramus_api.modules.access.infrastructure.ai_connections import SqlAiConnectionStore
 from ramus_api.modules.access.infrastructure.credential_cipher import AesCredentialCipher
 from ramus_api.modules.access.infrastructure.email_deliveries import SqlEmailDeliveryStore
+from ramus_api.modules.access.infrastructure.passwords import ScryptPasswordHasher
 from ramus_api.modules.access.infrastructure.rate_limits import SqlAttemptStore
 from ramus_api.modules.access.infrastructure.stores import SqlAccountStore, SqlEmailCodeStore, SqlSessionStore
 from ramus_api.modules.access.infrastructure.system import SystemClock, SystemSecretSource
@@ -22,6 +25,8 @@ from ramus_api.shared.infrastructure import Database
 
 @dataclass(frozen=True)
 class AccessServices:
+    passwords: PasswordAuthentication[Session]
+    password_setup: PasswordSetup[Session]
     request_email_code: RequestEmailCode[Session]
     verify_email_code: VerifyEmailCode[Session]
     authenticator: SessionAuthenticator
@@ -56,6 +61,10 @@ def build_access_services(
     limits = AuthRateLimiter(database.transaction, SqlAttemptStore(), clock, secret)
     issuer = SessionIssuer(database.transaction, sessions, profiles, clock, secrets)
     return AccessServices(
+        password_setup=PasswordSetup(database.transaction, accounts, sessions, ScryptPasswordHasher(),
+                                     container.idempotency, clock, limits, secret),
+        passwords=PasswordAuthentication(database.transaction, accounts, accounts, shared_project, ScryptPasswordHasher(),
+                                         container.idempotency, issuer, clock, limits, secret),
         request_email_code=RequestEmailCode(
             container.idempotency, codes, container.mailer, clock, secrets, limits, secret,
             database.transaction, SqlEmailDeliveryStore(),

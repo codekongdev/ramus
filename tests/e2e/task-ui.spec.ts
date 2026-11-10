@@ -24,6 +24,7 @@ async function fixture(page: Page, accountId = 'u1', connected = true) {
     const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
     if (request.method() === 'GET') {
       if (path === '/api/me') return json({ ...me, account: { ...me.account, id: accountId }, ai_connection: { status: connected ? 'connected' : 'none' } });
+      if (path === '/api/me/password') return json({ configured: true });
       if (path === '/api/me/ai-connection') return json({ status: connected ? 'connected' : 'none' });
       if (path === '/api/projects') return json({ items: [{ id: 'p1', name: '공동 샘플', is_shared_sample: true }] });
       if (path === '/api/projects/p1/participants') return json({ items: [me.account] });

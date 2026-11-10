@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { test, expect, requestLoginCode, finishLogin } from './fixtures';
+import { test, expect, registerAccount, signInAccount, TEST_PASSWORD } from './fixtures';
 
 test('three separate sessions share participants and restore the session on refresh', async ({ browser, testServer }) => {
   const contexts = await Promise.all(Array.from({ length: 3 }, () => browser.newContext({ baseURL: testServer.url })));
@@ -7,8 +7,7 @@ test('three separate sessions share participants and restore the session on refr
     const pages = await Promise.all(contexts.map((context) => context.newPage()));
     const emails = pages.map((_, index) => `browser-${index}-${randomUUID().slice(0, 8)}@example.test`);
     await Promise.all(pages.map(async (page, index) => {
-      await requestLoginCode(page, emails[index]);
-      await finishLogin(page, await testServer.codeFor(emails[index]));
+      await registerAccount(page, emails[index]);
     }));
     const profiles = await Promise.all(pages.map(async (page) => {
       const response = await page.request.get('/api/me');
@@ -36,23 +35,40 @@ test('three separate sessions share participants and restore the session on refr
   }
 });
 
-test('wrong code keeps the form, email can be edited, and resend follows the cooldown', async ({ page, testServer }) => {
-  const email = `resend-${randomUUID().slice(0, 8)}@example.test`;
-  await page.goto('/');
-  await expect(page).toHaveURL(/\/login$/);
-  await requestLoginCode(page, `typo-${randomUUID().slice(0, 8)}@example.test`);
-  await page.getByRole('button', { name: '이메일 수정', exact: true }).click();
+test('signs in with a password after logout, preserving the email on invalid credentials', async ({ page }) => {
+  const email = `password-${randomUUID().slice(0, 8)}@example.test`;
+  let mailRequests = 0;
+  page.on('request', request => { if (/\/api\/auth\/(email-code|verify)$/.test(new URL(request.url()).pathname)) mailRequests += 1; });
+  await registerAccount(page, email, TEST_PASSWORD, '비밀번호 사용자');
+  await page.getByRole('button', { name: '로그아웃', exact: true }).click();
+  await expect(page.getByLabel('비밀번호', { exact: true })).toHaveValue('');
   await page.getByLabel('이메일', { exact: true }).fill(email);
-  await page.getByRole('button', { name: '인증 코드 받기', exact: true }).click();
-  await expect(page.getByLabel('인증 코드', { exact: true })).toBeVisible();
-  const firstCode = await testServer.codeFor(email);
-  await page.getByLabel('인증 코드', { exact: true }).fill(String((Number(firstCode) + 1) % 1_000_000).padStart(6, '0'));
+  await page.getByLabel('비밀번호', { exact: true }).fill('Wrong-password-2026');
   await page.getByRole('button', { name: '로그인', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('인증 코드가 올바르지 않습니다');
-  const resend = page.getByRole('button', { name: /다시 받기$/ });
-  await expect(resend).toBeDisabled();
-  await expect(resend).toBeEnabled({ timeout: 65_000 });
-  await resend.click();
-  await finishLogin(page, await testServer.codeFor(email, 2));
-  await expect(page.locator('[data-slot="participants"]')).toContainText(email.split('@')[0]);
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByLabel('이메일', { exact: true })).toHaveValue(email);
+  await signInAccount(page, email);
+  await expect(page.locator('[data-slot="participants"]')).toContainText('비밀번호 사용자');
+  expect(mailRequests).toBe(0);
+  expect(await page.evaluate(() => [JSON.stringify(localStorage), JSON.stringify(sessionStorage)])).toEqual(['{}', '{}']);
+});
+
+test('password forms fit a narrow screen and support password managers and visibility controls', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/login');
+  await expect(page.getByLabel('비밀번호', { exact: true })).toHaveAttribute('autocomplete', 'current-password');
+  await page.getByRole('button', { name: '회원가입', exact: true }).click();
+  const password = page.getByLabel('비밀번호', { exact: true });
+  await expect(password).toHaveAttribute('autocomplete', 'new-password');
+  await expect(page.getByLabel('비밀번호 확인', { exact: true })).toHaveAttribute('autocomplete', 'new-password');
+  await password.fill(TEST_PASSWORD);
+  await page.getByRole('button', { name: '비밀번호 보기', exact: true }).click();
+  await expect(password).toHaveAttribute('type', 'text');
+  await page.getByRole('button', { name: '비밀번호 숨기기', exact: true }).click();
+  await expect(password).toHaveAttribute('type', 'password');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+  await page.screenshot({ path: 'artifacts/password-signup-mobile.png', fullPage: true });
+  await page.getByRole('button', { name: '로그인으로 돌아가기', exact: true }).click();
+  await expect(page.getByLabel('비밀번호', { exact: true })).toHaveValue('');
+  await expect(page.getByLabel('인증 코드', { exact: true })).toHaveCount(0);
 });

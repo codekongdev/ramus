@@ -1,12 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { test, expect, requestLoginCode, finishLogin } from './fixtures';
+import { test, expect, registerAccount } from './fixtures';
 
 test('AI response, automatic tasks, cancellation and retry use the real API worker and SSE', async ({ page, testServer }) => {
   test.setTimeout(45_000);
   await page.setViewportSize({ width: 1440, height: 1000 });
   const email = `work-${randomUUID().slice(0, 8)}@example.test`;
-  await requestLoginCode(page, email);
-  await finishLogin(page, await testServer.codeFor(email));
+  await registerAccount(page, email);
   await page.getByRole('button', { name: '새 대화', exact: true }).click();
   await page.getByLabel('대화 제목', { exact: true }).fill('실제 실행 흐름 검증');
   await page.getByRole('button', { name: '만들기', exact: true }).click();

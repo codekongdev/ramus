@@ -78,7 +78,7 @@ sessions, AI connections, memberships, project names, and unrelated projects. Ac
 or another project's references to the sample conclusions prevent reset and roll back changes.
 There is no HTTP endpoint or product button for reset. See [B9 sample preparation](docs/b9-seed-content.md) for scope
 and local verification. B6 conclusion sharing is connected to the product UI and pinned AI inputs.
-Follow-up conversation creation remains dependent on B7 integration for the full product E2E.
+Follow-up conversations are connected to the complete product E2E.
 The left **결과물** menu lists the current project's saved conclusions with their source conversation,
 latest approved version, and save time. Unsaved drafts are excluded.
 
@@ -117,13 +117,17 @@ response reuses its idempotency key, so it selects the already created project w
 Start the API with `uv run --project apps/api python -m ramus_api` and the web app with `pnpm --filter @ramus/web dev`.
 The web development server forwards `/api` requests to `RAMUS_API_PORT`.
 
-No email is sent in development. Sign-in verification codes appear in the API server's terminal logs on a `[DEV MAIL - not sent]` line.
+Sign up with your email, nickname, and a 12–128 character password, then sign in with email and password. Registration signs you in immediately and joins the shared sample projects. No verification email or SMTP account is required. Passwords are salted and hashed with scrypt; they are never stored in plaintext.
+
+Existing accounts, sessions, project data, and AI connections are preserved. An existing email-only account cannot be claimed through registration. While signed in with an existing session, choose **비밀번호 설정** in the workspace header to set its first password, then use password login. Only the current session's account can be updated, and an existing password cannot be overwritten. Password recovery and email ownership verification are outside this MVP. See [password authentication and live-model verification](docs/password-auth.md) for migration and validation details.
 When serving over HTTPS, set `RAMUS_COOKIE_SECURE=true` to add the `Secure` attribute to session cookies.
 In deployed environments, set `RAMUS_AUTH_SECRET` to a stable secret of at least 32 characters. It is used for the HMAC of verification codes and sign-in receipts. If left empty, a new temporary value is generated each time the development server restarts, invalidating outstanding codes and retry receipts.
 
-## Production mail delivery
+## Optional legacy email-code delivery
 
-Set `RAMUS_ENV=staging` or `production`, `RAMUS_MAILER=smtp`, a stable `RAMUS_AUTH_SECRET`,
+The old email-code endpoints are disabled by default and return 410. Only enable `RAMUS_EMAIL_CODE_AUTH_ENABLED=true` when you explicitly need the legacy flow. Its SMTP implementation and isolated legacy tests are retained; the product login screen does not use it.
+
+For that optional flow, set `RAMUS_ENV=staging` or `production`, `RAMUS_MAILER=smtp`, a stable `RAMUS_AUTH_SECRET`,
 `RAMUS_SMTP_HOST`, and `RAMUS_SMTP_FROM` to use your provider's verified sender. Configure
 `RAMUS_SMTP_USERNAME` and `RAMUS_SMTP_PASSWORD` together when the provider requires authentication.
 `RAMUS_SMTP_SECURITY=starttls` with port `587` is the default; use `tls` with the provider's implicit-TLS
@@ -142,9 +146,9 @@ Tests (`uv run --project apps/api pytest`) do not use the development database s
 Each run creates and migrates a temporary `ramus_test_<random>` database on the same server, then removes it when finished.
 Integration tests fail if PostgreSQL is not running. Add `-m "not integration"` to run unit tests only.
 
-Run the sign-in browser tests with `pnpm test:e2e`. Before the first run, install the browser with `pnpm exec playwright install chromium`.
+Run the registration and password sign-in browser tests with `pnpm test:e2e`. Before the first run, install the browser with `pnpm exec playwright install chromium`.
 The tests create and migrate a temporary database, start the API and web servers on available ports, and clean up the servers and temporary database when finished.
-Codes printed by the development mailer are read only within the fixture; no real email is sent. Resend tests wait for the actual 60-second rate limit to expire.
+Browser tests register synthetic accounts through the product UI. The test server disables email-code authentication and does not send mail.
 The browser test server injects a deterministic model gateway and a synthetic key validator. Its worker, database, API, and SSE
 remain real; it never calls OpenAI. The connected MVP flow is covered by `tests/e2e/mvp-workflow.spec.ts`;
 task cancellation and retry are covered by `tests/e2e/work-execution.spec.ts`. See [execution integration](docs/live-work-execution.md).

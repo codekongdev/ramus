@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { test, expect, requestLoginCode, finishLogin } from './fixtures';
+import { test, expect, registerAccount } from './fixtures';
 import { task, conversation, parent, me, createdAt } from '../../apps/web/tests/fixtures/tasks';
 import { result, revision } from '../../apps/web/tests/results-fixtures';
 
@@ -38,6 +38,7 @@ async function mockFollowup(page: Page, sourceAccess = true) {
       return json(created);
     }
     if (path === '/api/me') return json({ ...me, ai_connection: { status: 'none' } });
+    if (path === '/api/me/password') return json({ configured: true });
     if (path === '/api/projects') return json({ items: projects });
     if (path === '/api/projects/search') return json({ items: projects.filter(item => item.name.includes(url.searchParams.get('q') ?? '')) });
     if (path.endsWith('/participants')) return json({ items: [me.account] });
@@ -185,8 +186,7 @@ test('the creation form stays within small and landscape viewports with reduced 
 
 test('real server creates a root conversation with exactly the viewed conclusion and no automatic AI run', async ({ page, testServer }) => {
   const email = `b7-${Date.now()}@example.test`;
-  await requestLoginCode(page, email);
-  await finishLogin(page, await testServer.codeFor(email));
+  await registerAccount(page, email);
   const me = await (await page.request.get('/api/me')).json();
   const headers = () => ({ 'Idempotency-Key': crypto.randomUUID() });
   async function post(path: string, data: unknown) {

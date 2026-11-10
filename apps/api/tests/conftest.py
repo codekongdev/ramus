@@ -134,7 +134,7 @@ def database(database_url: str) -> Iterator[Database]:
 
 @pytest.fixture
 def integration_settings(database_url: str) -> Settings:
-    return Settings(_env_file=None, database_url=database_url)
+    return Settings(_env_file=None, database_url=database_url, RAMUS_EMAIL_CODE_AUTH_ENABLED=True)
 
 
 @pytest.fixture

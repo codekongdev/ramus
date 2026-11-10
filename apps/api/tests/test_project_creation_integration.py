@@ -21,7 +21,11 @@ def workspace(integration_settings):
     mailer = FakeMailer()
     app = create_app(integration_settings, mailer=mailer)
     with ExitStack() as stack:
-        clients = [stack.enter_context(TestClient(app)) for _ in range(2)]
+        # One application owns one relay lifespan; sessions still use independent cookie jars.
+        first = stack.enter_context(TestClient(app))
+        second = TestClient(app)
+        stack.callback(second.close)
+        clients = [first, second]
         profiles = [login(client, mailer, unique_email("project-owner")).json() for client in clients]
         yield app, clients, profiles
 

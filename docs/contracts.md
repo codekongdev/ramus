@@ -1,4 +1,4 @@
-# ramus 계약 v1.8
+# ramus 계약 v1.10
 
 확정일: 2026-11-09 · 작업자: 메이슨, 헤이든 · 상태: 확정
 
@@ -41,7 +41,12 @@
 
 | 항목 | 규칙 |
 |---|---|
-| 인증 코드 | ASCII 숫자 6자리, 서버 비밀값 기반 HMAC으로 저장, 10분 후 만료, 코드당 5회까지 확인, 같은 이메일 재요청은 60초 간격. 이메일은 정규화 후 254자 이하이며 제어 문자를 허용하지 않는다 |
+| 기본 인증 | 인증메일 없이 이메일·비밀번호·닉네임으로 회원가입하고 이메일·비밀번호로 로그인한다. 가입 성공 시 자동 로그인한다. 이메일은 정규화 후 254자 이하이며 제어 문자를 허용하지 않는다 |
+| 비밀번호 | 12~128자. 공백·Unicode를 그대로 보존하며 문자 조합을 강제하지 않는다. scrypt(N=32768, r=8, p=3), 무작위 salt 16바이트, 파생 키 32바이트로 저장한다. 원문은 응답·이벤트·로그·receipt에 남기지 않으며 멱등 본문에는 서버 비밀값 기반 HMAC만 사용한다 |
+| 가입·로그인 상한 | 최근 1시간 기준 가입은 이메일당 10회·IP당 60회, 비밀번호 로그인은 이메일당 30회·IP당 300회. 성공 응답 유실 후 같은 요청 재생은 10분 이내·최초 포함 3회 세션 발급으로 제한한다. 프록시 전달 헤더 대신 서버가 확인한 IP를 사용한다 |
+| 기존 계정 | 비밀번호가 없는 기존 계정에 같은 이메일로 가입해 비밀번호를 덮어쓸 수 없다. 가입은 409, 비밀번호 로그인은 다른 자격증명 오류와 동일한 401이다. 기존 세션·프로젝트·AI 연결은 보존한다. 이메일 소유 확인과 비밀번호 분실 복구는 이번 범위에 포함하지 않는다 |
+| 기존 계정 초기 설정 | 활성 세션으로 본인 계정의 비밀번호 유무만 조회하고, 비밀번호가 없을 때 한 번 설정한다. 이메일·계정 ID를 입력받지 않는다. 변경 트랜잭션에서 세션 소유·폐기·만료를 잠금 후 재검사하고 null 조건부 갱신으로 동시 덮어쓰기를 막는다. 멱등 receipt는 계정·세션별로 격리하고 재생 응답 전에도 세션을 확인한다. 설정 요청은 최근 1시간 이메일당 10회·IP당 60회로 제한한다 |
+| 선택적 기존 인증 코드 | 기본 비활성(`RAMUS_EMAIL_CODE_AUTH_ENABLED=false`), 아래 두 기존 API는 410 `AUTH_METHOD_DISABLED`. 명시적으로 활성화한 이전 흐름에서만 ASCII 숫자 6자리·10분 만료·코드당 5회 확인·60초 재전송 제한을 적용한다 |
 | 인증 요청 상한 | 최근 1시간 기준 코드 요청은 이메일당 10회·접속 IP당 60회, 코드 확인은 이메일당 30회·접속 IP당 300회. 재전송으로 상한이 초기화되지 않는다. 프록시 전달 헤더 대신 서버가 확인한 접속 IP를 사용한다. 상한에 걸리면 429 `AUTH_RATE_LIMITED`, `details.resend_available_at`에 다음 허용 시각을 준다 |
 | 인증 재시도 | verify를 같은 키와 본문으로 재시도하면 코드 만료 전까지 새 세션을 발급하되 최초 요청을 포함해 3회로 제한한다. receipt에는 코드 원문 대신 서버 비밀값 기반 HMAC을 사용한 fingerprint를 남긴다. 로그아웃은 세션이 없어도 `{}`를 돌려준다 |
 | 메일 발송 | `Mailer` 포트. 개발 환경은 로그, 운영은 검증된 TLS SMTP. 발송 예약·시도 상태를 저장하고 메일 수락 뒤 코드 해시를 활성화한다. 실패는 503, 같은 키로 재요청하면 새 시도를 예약한다. 살아 있는 발송 lease는 503이며 시간당 상한은 유지한다 |
@@ -64,6 +69,10 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 | `AUTH_CODE_INVALID` | 422 | 인증 코드 불일치 |
 | `AUTH_CODE_EXPIRED` | 422 | 인증 코드 만료·확인 횟수 초과 |
 | `AUTH_RATE_LIMITED` | 429 | 인증 코드 재요청 간격·요청/확인/세션 재발급 상한 위반 |
+| `AUTH_INVALID_CREDENTIALS` | 401 | 이메일 또는 비밀번호가 잘못됨. 없는 계정과 비밀번호 미설정 계정을 구분하지 않는다 |
+| `ACCOUNT_ALREADY_EXISTS` | 409 | 정규화한 이메일이 이미 등록돼 있음. 기존 계정·비밀번호를 변경하지 않는다 |
+| `PASSWORD_ALREADY_SET` | 409 | 초기 비밀번호가 이미 설정됨. 기존 비밀번호를 변경하지 않는다 |
+| `AUTH_METHOD_DISABLED` | 410 | 기본 비활성인 기존 이메일 코드 인증 API 요청 |
 | `AI_CONNECTION_REQUIRED` | 409 | 키가 연결되지 않은 계정이 AI 실행을 요청함. 메시지는 저장하지 않는다 |
 | `AI_KEY_INVALID` | 422 | 키 확인 호출 실패 |
 | `ACTIVE_RUN_EXISTS` | 409 | 같은 대화에 활성 AI 실행이 있음. 메시지는 저장하지 않는다 |
@@ -120,10 +129,14 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 
 | 메서드·경로 | 요청 | 응답 | 비고 |
 |---|---|---|---|
-| `POST /api/auth/email-code` | `{email}` | 202 `{resend_available_at}` | 코드 발송. 계정 존재 여부를 알리지 않는다 |
-| `POST /api/auth/verify` | `{email, code}` | `Me` + 세션 쿠키 | 계정이 없으면 만들고 공동 샘플에 참여시킨다 |
+| `POST /api/auth/register` | `{email, password, display_name}` | `Me` + 세션 쿠키 | 인증메일 없이 가입하고 공동 샘플에 참여한다. 비밀번호·닉네임 경계 검증과 멱등 키 필수 |
+| `POST /api/auth/login` | `{email, password}` | `Me` + 세션 쿠키 | 비밀번호 로그인. 실패는 일반화한 401, 시도·멱등 재생 상한 적용 |
+| `POST /api/auth/email-code` | `{email}` | 202 `{resend_available_at}` | 선택적 이전 흐름. 기본 410이며 명시적으로 활성화했을 때만 코드 발송 |
+| `POST /api/auth/verify` | `{email, code}` | `Me` + 세션 쿠키 | 선택적 이전 흐름. 기본 410이며 활성화했을 때만 계정 생성·공동 샘플 참여 |
 | `POST /api/auth/logout` | `{}` | `{}` | 세션 폐기 |
 | `GET /api/me` | | `Me` | 프론트는 `/` 진입 시 `default_project_id`로 이동한다 |
+| `GET /api/me/password` | | `{configured: boolean}` | 현재 활성 세션 본인 계정의 비밀번호 설정 유무. 해시는 노출하지 않는다 |
+| `PUT /api/me/password` | `{password}` | `{configured: true}` | 본인 계정의 최초 설정만 허용. 멱등 키 필수, 이미 설정된 경우 409. 같은 세션·키·본문의 재시도만 성공 재생 |
 | `GET /api/me/ai-connection` | | `{status}` | |
 | `PUT /api/me/ai-connection` | `{api_key}` | `{status: "connected"}` | 저비용 호출로 키를 확인한 뒤 암호화해 저장. 실패 시 `AI_KEY_INVALID` |
 | `DELETE /api/me/ai-connection` | | `{status: "none"}` | 이후 새 실행 불가. 이미 접수한 실행은 키 조회 시점에 실패 처리 |
@@ -196,7 +209,7 @@ HTTP 상태별 기본 코드(`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FO
 | 테이블 | 모듈 | 주요 컬럼 | 제약·인덱스 |
 |---|---|---|---|
 | `project` | projects | `id`, `name`, `is_shared_sample`, `seed_key \| null` | `seed_key` 고유 |
-| `account` | access | `id`, `email`(소문자 정규화), `display_name` | `email` 고유 |
+| `account` | access | `id`, `email`(소문자 정규화), `display_name`, `password_hash \| null` | `email` 고유. 기존 계정은 hash가 null이며 인증된 이전 없이 새 비밀번호를 설정하지 않는다 |
 | `membership` | access | `account_id`, `project_id`, `role`(`editor`) | PK(`account_id`, `project_id`) |
 | `email_code` | access | `id`, `email`, `code_hash`, `expires_at`, `attempts`, `consumed_at \| null` | (`email`, `created_at`) 인덱스. 성공적으로 발송 확정된 코드만 활성화 |
 | `email_code_delivery` | access | `id`, `email`, `status`, `attempt_id \| null`, `code_id \| null`, `code_hash \| null`, `code_created_at \| null`, `expires_at \| null`, `lease_until \| null`, `sent_at \| null` | `pending/sending/failed/sent`. 이메일별 sending 하나, 시도 토큰으로 늦은 완료 차단. 멱등 receipt는 delivery_id만 참조하며 코드 원문은 저장하지 않음 |
@@ -369,6 +382,8 @@ export type TaskModalProps = {
 
 | 날짜 | 버전 | 내용 |
 |---|---|---|
+| 2026-11-10 | v1.9 | 기본 인증을 이메일·비밀번호·닉네임 가입/비밀번호 로그인으로 전환. scrypt 저장·HMAC 멱등 본문·기존 계정 보호·기존 OTP 기본 비활성 및 SMTP 선택 사항 처리 |
+| 2026-11-10 | v1.10 | 기존 활성 세션으로 본인 계정의 비밀번호 최초 설정. SID 재검사·행 잠금·null 조건부 갱신·세션별 멱등 재생 및 설정 상태 API 추가 |
 | 2026-11-09 | v1.8 | B7: 받은 결론에서 후속 대화를 시작할 고정 입력 상세 조회 추가. 제한된 수신자의 원본 최신 버전 메타데이터 노출 방지 |
 | 2026-11-09 | v1.7 | B4 추가 검수: 긴 정리의 구간별 추출·종합 한도 실패 코드 `SUMMARY_LIMIT_EXCEEDED` 추가. 정리·승인 멱등 재전송에서도 현재 참여 권한을 확인 |
 | 2026-11-09 | v1.6 | B4: 정리 요청 시점 입력 고정용 `result_draft.context_snapshot`, 승인 저장의 필수 `source_run_id` 추가. 기준 버전이 같아도 재생성된 초안과 다른 출처로 편집 본문을 저장하면 409 |

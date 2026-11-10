@@ -14,12 +14,14 @@ from login_flow import (
     ME_PATH,
     error_code,
     latest_code,
-    login,
     new_key,
     request_code,
     unique_email,
     verify,
     wrong_code,
+)
+from login_flow import (
+    legacy_login as login,
 )
 from sqlalchemy import create_engine, func, select, text
 
@@ -98,7 +100,7 @@ def count_rows(url: str) -> tuple[int, int]:
 
 def test_three_accounts_join_the_same_shared_project(migrated_fresh_url: str) -> None:
     mailer = FakeMailer()
-    app = create_app(Settings(_env_file=None, database_url=migrated_fresh_url), mailer=mailer)
+    app = create_app(Settings(_env_file=None, database_url=migrated_fresh_url, RAMUS_EMAIL_CODE_AUTH_ENABLED=True), mailer=mailer)
     emails = [unique_email(name) for name in ("ana", "ben", "cho")]
     with ExitStack() as stack:
         # One application has one lifespan; each account still has its own cookie jar.
@@ -123,7 +125,7 @@ def test_three_accounts_join_the_same_shared_project(migrated_fresh_url: str) ->
 def test_concurrent_first_logins_create_one_project_and_one_membership_each(migrated_fresh_url: str) -> None:
     # ON-AC-11: no seed command ran; racing logins must still create the shared project only once.
     mailer = FakeMailer()
-    app = create_app(Settings(_env_file=None, database_url=migrated_fresh_url), mailer=mailer)
+    app = create_app(Settings(_env_file=None, database_url=migrated_fresh_url, RAMUS_EMAIL_CODE_AUTH_ENABLED=True), mailer=mailer)
     emails = [unique_email(f"racer{n}") for n in range(6)]
     with ExitStack() as stack:
         clients = [stack.enter_context(TestClient(app))]

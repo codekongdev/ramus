@@ -1024,6 +1024,58 @@
         "title": "MessageList",
         "type": "object"
       },
+      "PasswordConfigured": {
+        "properties": {
+          "configured": {
+            "const": true,
+            "title": "Configured",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "configured"
+        ],
+        "title": "PasswordConfigured",
+        "type": "object"
+      },
+      "PasswordLoginRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "maxLength": 254,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "format": "password",
+            "maxLength": 128,
+            "minLength": 12,
+            "title": "Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "password",
+          "email"
+        ],
+        "title": "PasswordLoginRequest",
+        "type": "object"
+      },
+      "PasswordState": {
+        "properties": {
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "configured"
+        ],
+        "title": "PasswordState",
+        "type": "object"
+      },
       "PostMessageRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1198,6 +1250,38 @@
           "updated_at"
         ],
         "title": "ProjectResultSummary",
+        "type": "object"
+      },
+      "RegisterAccountRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "maxLength": 254,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "format": "password",
+            "maxLength": 128,
+            "minLength": 12,
+            "title": "Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "password",
+          "email",
+          "display_name"
+        ],
+        "title": "RegisterAccountRequest",
         "type": "object"
       },
       "ReplaceAppliedResourcesRequest": {
@@ -1896,6 +1980,24 @@
         "title": "SaveResultRevisionRequest",
         "type": "object"
       },
+      "SetInitialPasswordRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "format": "password",
+            "maxLength": 128,
+            "minLength": 12,
+            "title": "Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "title": "SetInitialPasswordRequest",
+        "type": "object"
+      },
       "ShareOutcomeList": {
         "properties": {
           "items": {
@@ -2183,6 +2285,77 @@
         ]
       }
     },
+    "/api/auth/login": {
+      "post": {
+        "operationId": "loginWithPassword",
+        "parameters": [
+          {
+            "description": "Required. 1-128 characters of [A-Za-z0-9._:-]. Reusing a key with the same body replays the stored response.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Required. 1-128 characters of [A-Za-z0-9._:-]. Reusing a key with the same body replays the stored response.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Client error"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Server error"
+          }
+        },
+        "summary": "Login With Password",
+        "tags": [
+          "access"
+        ]
+      }
+    },
     "/api/auth/logout": {
       "post": {
         "operationId": "logout",
@@ -2249,6 +2422,77 @@
           }
         },
         "summary": "Logout",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "operationId": "registerAccount",
+        "parameters": [
+          {
+            "description": "Required. 1-128 characters of [A-Za-z0-9._:-]. Reusing a key with the same body replays the stored response.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Required. 1-128 characters of [A-Za-z0-9._:-]. Reusing a key with the same body replays the stored response.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Client error"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Server error"
+          }
+        },
+        "summary": "Register Account",
         "tags": [
           "access"
         ]
@@ -3088,6 +3332,116 @@
           }
         },
         "summary": "Connect Ai",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/api/me/password": {
+      "get": {
+        "operationId": "getPasswordStatus",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Client error"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Server error"
+          }
+        },
+        "summary": "Get Password Status",
+        "tags": [
+          "access"
+        ]
+      },
+      "put": {
+        "operationId": "setInitialPassword",
+        "parameters": [
+          {
+            "description": "Required. 1-128 characters of [A-Za-z0-9._:-]. Reusing a key with the same body replays the stored response.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Required. 1-128 characters of [A-Za-z0-9._:-]. Reusing a key with the same body replays the stored response.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetInitialPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordConfigured"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Client error"
+          },
+          "5XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Server error"
+          }
+        },
+        "summary": "Set Initial Password",
         "tags": [
           "access"
         ]

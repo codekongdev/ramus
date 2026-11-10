@@ -13,12 +13,14 @@ from login_flow import (
     SESSION_COOKIE,
     error_code,
     latest_code,
-    login,
     logout,
     request_code,
     set_cookie_headers,
     unique_email,
     verify,
+)
+from login_flow import (
+    legacy_login as login,
 )
 from sqlalchemy import select, text
 

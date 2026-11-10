@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
-import { test, expect, requestLoginCode, finishLogin } from './fixtures';
+import { test, expect, registerAccount } from './fixtures';
 
 const panel = (page: Page) => page.locator('[data-slot="conversation"]');
 const log = (page: Page) => panel(page).getByRole('log', { name: '대화 메시지' });
@@ -34,8 +34,7 @@ test('two accounts create and discuss together, then recover missed SSE messages
     })));
     const emails = pages.map((_, index) => `a2-${index}-${randomUUID().slice(0, 8)}@example.test`);
     await Promise.all(pages.map(async (page, index) => {
-      await requestLoginCode(page, emails[index]);
-      await finishLogin(page, await testServer.codeFor(emails[index]));
+      await registerAccount(page, emails[index]);
       await page.waitForFunction(() => (window as unknown as { a2EventSources: EventSource[] })
         .a2EventSources.some(source => source.readyState === EventSource.OPEN));
     }));

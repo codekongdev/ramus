@@ -6,6 +6,7 @@ import { useStore } from '../../lib/mvi';
 import { Avatar, Button } from '../../ui';
 import { ProjectSwitcher } from '../projects';
 import { useAuth } from './AuthProvider';
+import { PasswordSetupButton } from './PasswordSetup';
 import { authMessages as m } from './messages';
 import { initialParticipantsState, makeParticipantsEffects, participantsReducer } from './participants';
 
@@ -32,7 +33,7 @@ export function useWorkspaceHeader(projectId: string) {
           {state.items.map(member => <li key={member.id}><Avatar name={member.display_name} size="xs" /><span>{member.id === account?.id ? m.currentAccount(member.display_name) : member.display_name}</span></li>)}
         </ul>
       </details>}
-      {account && <div className="auth-account"><Avatar name={account.display_name} size="xs" /><span className="auth-account-name" title={account.email}>{account.display_name}</span><Button variant="ghost" disabled={auth.busy} onClick={() => dispatchAuth({ type: 'logout', key: newIdempotencyKey() })}>{auth.busy ? m.loggingOut : m.logout}</Button></div>}
+      {account && <div className="auth-account"><Avatar name={account.display_name} size="xs" /><span className="auth-account-name" title={account.email}>{account.display_name}</span><PasswordSetupButton key={account.id} accountId={account.id} disabled={auth.busy} /><Button variant="ghost" disabled={auth.busy} onClick={() => dispatchAuth({ type: 'logout', key: newIdempotencyKey() })}>{auth.busy ? m.loggingOut : m.logout}</Button></div>}
       {auth.error && <p role="alert" className="auth-error">{auth.error}</p>}
     </div>,
   };
