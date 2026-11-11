@@ -23,6 +23,8 @@ from ramus_api.modules.execution.domain.work import WorkMessage
 from ramus_api.modules.results.application.long_summary import LongSummaryGateway
 from ramus_api.modules.results.domain.summary import SUMMARY_RULES, build_summary_request
 from ramus_api.modules.results.domain.summary_chunks import (
+    COMBINE_RULES,
+    EXTRACT_RULES,
     PartialConclusion,
     SummaryLimitExceeded,
     SummaryLimits,
@@ -196,6 +198,27 @@ async def test_original_pinned_skills_reach_every_extraction_and_reduction_even_
             assert all("검증-표식-v1" not in part["conclusion"] for part in data["sources"])
     assert "extract" in stages and stages[-1] == "combine"
     assert stages.count("combine") > 1  # Includes intermediate and final synthesis.
+
+
+async def test_every_extract_and_combine_request_carries_placeholder_guidance():
+    original = skill_request()
+    assert "자리표시" in original.messages[0].content  # Built single-call system message.
+    limits = SummaryLimits(input_bytes=8192, source_bytes=500_000, calls=128)
+    inner = RecordingGateway(partial="a" * 500)
+    await LongSummaryGateway(inner, limits).complete(original)
+    stages = set()
+    for value in inner.requests:
+        system = value.messages[0].content
+        stage = json.loads(value.messages[-1].content)["stage"]
+        stages.add(stage)
+        assert "자리표시" in system  # Base rule prefixed to every call.
+        if stage == "extract":
+            assert "omit it instead of writing a placeholder" in system
+            assert EXTRACT_RULES in system and COMBINE_RULES not in system
+        else:
+            assert "remove placeholder or pattern text" in system
+            assert COMBINE_RULES in system and EXTRACT_RULES not in system
+    assert stages == {"extract", "combine"}
 
 
 async def test_oversized_pinned_skills_fail_instead_of_being_dropped_or_truncated():
