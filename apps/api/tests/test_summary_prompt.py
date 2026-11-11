@@ -16,7 +16,7 @@ from ramus_api.modules.execution.domain.models import (
     RunView,
 )
 from ramus_api.modules.execution.domain.work import WorkMessage
-from ramus_api.modules.results.domain.summary import build_summary_request
+from ramus_api.modules.results.domain.summary import SUMMARY_RULES, build_summary_request
 from ramus_api.modules.results.presentation.dto import SaveResultRevisionRequest
 
 
@@ -51,6 +51,11 @@ def test_summary_prompt_has_one_privileged_instruction_and_pinned_input_only():
     assert data["previous_conclusion"] is None
     assert first.message_from_seq == 11 and first.message_to_seq == 15
     assert first.context is context and first.credential_account_id == account
+
+
+def test_summary_rules_forbid_copying_placeholder_patterns_from_instructions():
+    assert "자리표시" in SUMMARY_RULES and "실제로 있는 텍스트만" in SUMMARY_RULES
+    assert "SRC" not in SUMMARY_RULES
 
 
 @pytest.mark.parametrize("text", [" ", "\n\t", "bad\x00text", "bad\ud800text"])
