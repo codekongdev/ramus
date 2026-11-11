@@ -74,4 +74,4 @@
 
 검증: `pnpm verify --only api:lint,api:unit` 통과(API 단위 742개), `uv run --project apps/api pytest apps/api/tests/test_results_integration.py -q` 통과(통합 12개). 단위 테스트는 단일 호출과 모든 추출·종합 요청에 자리표시 금지 규칙이 들어가는지 확인한다. API 키는 출력하거나 저장하지 않았고, 평가 로그와 결과 파일에 키 형식 문자열이 없음을 확인했다.
 
-한계: 합성 입력 한 종류와 명시적인 지침으로 1차 8회, 2차 11회를 시도한 결과다. 실제 사용자 자료, 다양한 지침 표현, 중간 종합이 필요한 더 긴 입력의 품질과 분기 전체 평가 세트는 별도로 확인해야 한다. 평가 스크립트는 저장소에 포함하지 않았다.
+한계: 합성 입력 한 종류와 명시적인 지침으로 1차 8회, 2차 11회를 시도한 결과다. 실제 사용자 자료, 다양한 지침 표현, 중간 종합이 필요한 더 긴 입력의 품질과 분기 전체 평가 세트는 별도로 확인해야 한다. 평가 스크립트는 `apps/api/scripts/eval_summary_instructions.py`이며, 공급자 없이는 `pnpm api:eval-summary --mode fake`, 실제 모델로는 `pnpm api:eval-summary --mode live --env-file <키 파일>`로 실행한다. live 모드는 실제 모델을 호출하므로 비용이 들고 `pnpm verify`에 포함되지 않는다. 결과 보고서는 `artifacts/summary-eval/`에 쓴다.

@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "api:openapi": "uv run --project apps/api python apps/api/scripts/export_openapi.py",
+    "api:eval-summary": "uv run --project apps/api python apps/api/scripts/eval_summary_instructions.py",
     "gen:api": "pnpm api:openapi && pnpm --filter @ramus/web gen:api",
     "db:up": "docker compose up -d --wait db",
     "db:stop": "docker compose stop db",
