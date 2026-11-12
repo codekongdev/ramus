@@ -10,10 +10,14 @@ import pytest
 
 from ramus_api.modules.results.domain.summary_chunks import SummaryLimits
 
-SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "eval_summary_instructions.py"
+SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
+SCRIPT_PATH = SCRIPTS_DIR / "eval_summary_instructions.py"
 
 
 def _load_script():
+    # Running a script file puts its directory on sys.path; reproduce that for the sibling eval_support import.
+    if str(SCRIPTS_DIR) not in sys.path:
+        sys.path.insert(0, str(SCRIPTS_DIR))
     spec = importlib.util.spec_from_file_location("eval_summary_instructions", SCRIPT_PATH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -121,36 +125,6 @@ def test_empty_conclusion_fails(short_fixture):
 def test_hangul_share():
     assert script.hangul_share("가나다abc") == 0.5
     assert script.hangul_share("123") == 0.0
-
-
-# --------------------------------------------------------------------------- env-file parser
-
-
-@pytest.mark.parametrize(
-    ("content", "expected"),
-    [
-        ("OTHER=x\n# c\nexport OPENAI_API_KEY='dummy-k'  # note\nOPENAI_API_KEY_X=no\n", "dummy-k"),
-        ('OPENAI_API_KEY="dq-key"\n', "dq-key"),
-        ("OPENAI_API_KEY=plain # comment\n", "plain"),
-        ("OPENAI_API_KEY_X=no\nOTHER=1\n", None),
-        ("OTHER=1\n", None),
-        ("OPENAI_API_KEY=\n", None),
-    ],
-)
-def test_read_env_key(tmp_path, content, expected):
-    env_path = tmp_path / "sample.env"
-    env_path.write_text(content, encoding="utf-8")
-    assert script.read_env_key(env_path) == expected
-
-
-def test_resolve_api_key_exits_without_key(tmp_path, monkeypatch):
-    env_path = tmp_path / "empty.env"
-    env_path.write_text("OTHER=1\n", encoding="utf-8")
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    for env_file in (str(env_path), None):
-        with pytest.raises(SystemExit) as excinfo:
-            script.resolve_api_key(env_file)
-        assert "needs OPENAI_API_KEY" in str(excinfo.value)
 
 
 # --------------------------------------------------------------------------- CLI
